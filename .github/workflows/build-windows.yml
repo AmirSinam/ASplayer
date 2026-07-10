@@ -22,6 +22,10 @@ jobs:
       - name: ساخت اسکلت ویندوز
         run: flutter create --platforms=windows .
 
+      # flutter create فایل تست پیش‌فرض را می‌سازد که به کد ما نمی‌خورد.
+      - name: حذف تست پیش‌فرض
+        run: Remove-Item test/widget_test.dart -ErrorAction SilentlyContinue
+
       - name: گرفتن بسته‌ها
         run: flutter pub get
 
