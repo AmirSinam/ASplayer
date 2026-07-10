@@ -20,7 +20,9 @@ dependencies:
   path: ^1.9.0
   file_picker: ^8.1.2
   audio_metadata_reader: ^1.6.0
-  receive_sharing_intent: ^1.8.0
+  # 1.9.x builds against compileSdk 37, which Flutter's Android toolchain
+  # does not ship yet. Pinned until the toolchain catches up.
+  receive_sharing_intent: '>=1.8.0 <1.9.0'
   shared_preferences: ^2.3.2
 
   # about screen
