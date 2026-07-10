@@ -52,6 +52,9 @@ ThemeData appTheme(Brightness brightness) {
     useMaterial3: true,
     brightness: brightness,
     scaffoldBackgroundColor: colors.background,
+    // Vazirmatn everywhere — one attractive family that renders both Persian
+    // and Latin. Text styles that don't name a family inherit this.
+    fontFamily: 'Vazirmatn',
     colorScheme: ColorScheme.fromSeed(
       seedColor: accent,
       brightness: brightness,
@@ -61,6 +64,9 @@ ThemeData appTheme(Brightness brightness) {
     splashFactory: InkRipple.splashFactory,
   );
 }
+
+/// The display family reserved for the ASplayer wordmark.
+const wordmarkFont = 'Unbounded';
 
 /// Radii used across the app.
 class R {

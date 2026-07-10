@@ -52,15 +52,30 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      s.hello,
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w800,
-                        color: colors.primaryText,
+                    // The wordmark: "AS" in tiffany, "player" in the text colour,
+                    // set in the display font. Forced LTR so it reads correctly
+                    // even in the Persian layout.
+                    Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: Text.rich(
+                        TextSpan(
+                          children: [
+                            const TextSpan(text: 'AS', style: TextStyle(color: accent)),
+                            TextSpan(
+                              text: 'player',
+                              style: TextStyle(color: colors.primaryText),
+                            ),
+                          ],
+                        ),
+                        style: const TextStyle(
+                          fontFamily: wordmarkFont,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 4),
                     Text(
                       s.songsInLibrary(tracks.length),
                       style: TextStyle(fontSize: 13, color: colors.secondaryText),

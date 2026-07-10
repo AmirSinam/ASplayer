@@ -38,3 +38,13 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  fonts:
+    # Covers Persian and Latin in one family — the whole app's text.
+    - family: Vazirmatn
+      fonts:
+        - asset: assets/fonts/Vazirmatn.ttf
+    # Display face, used only for the ASplayer wordmark.
+    - family: Unbounded
+      fonts:
+        - asset: assets/fonts/Unbounded.ttf

@@ -40,10 +40,6 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
     _aura = AnimationController(vsync: this, duration: const Duration(seconds: 12))..repeat();
     _float = AnimationController(vsync: this, duration: const Duration(seconds: 4))
       ..repeat(reverse: true);
-    // The hardware buttons may have moved the volume since we last looked.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.read<PlayerController>().refreshVolume();
-    });
   }
 
   @override
@@ -81,9 +77,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                   _titleRow(track, s, colors, store),
                   const SizedBox(height: 14),
                   _seek(player, s, colors, track),
-                  const SizedBox(height: 12),
-                  _volume(player, colors),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 18),
                   _controls(player, colors),
                 ],
               ),
@@ -346,23 +340,6 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
           ],
         );
       },
-    );
-  }
-
-  // MARK: - Volume
-
-  Widget _volume(PlayerController player, AppColors colors) {
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: Row(
-        children: [
-          Icon(Icons.volume_down, size: 18, color: colors.secondaryText),
-          Expanded(
-            child: ScrubBar(progress: player.volume, onScrub: player.setVolume),
-          ),
-          Icon(Icons.volume_up, size: 18, color: colors.secondaryText),
-        ],
-      ),
     );
   }
 
