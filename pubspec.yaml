@@ -12,6 +12,8 @@ dependencies:
 
   # playback + background service
   just_audio: ^0.9.42
+  # Windows playback backend for just_audio (mobile/mac use the default one).
+  just_audio_windows: ^0.2.3
   audio_service: ^0.18.15
   audio_session: ^0.1.21
 

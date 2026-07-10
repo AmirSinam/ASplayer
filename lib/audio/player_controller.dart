@@ -9,6 +9,7 @@ import '../data/device_music.dart';
 import '../data/library_store.dart';
 import '../data/widget_bridge.dart';
 import '../models.dart';
+import '../platform.dart';
 
 /// Owns playback and the queue. The audio_service handler below is a thin shell
 /// that forwards notification / headphone commands here.
@@ -21,11 +22,13 @@ class PlayerController extends ChangeNotifier {
       _publish();
       notifyListeners();
     });
-    // Start the slider matching the phone's current media volume.
-    DeviceMusic.getVolume().then((v) {
-      _volume = v;
-      notifyListeners();
-    });
+    // Start the slider matching the phone's current media volume (Android).
+    if (Plat.isAndroid) {
+      DeviceMusic.getVolume().then((v) {
+        _volume = v;
+        notifyListeners();
+      });
+    }
   }
 
   final LibraryStore store;
@@ -119,15 +122,22 @@ class PlayerController extends ChangeNotifier {
   }
 
   /// Re-reads the system volume — call when the player opens, in case the
-  /// hardware buttons moved it while we weren't looking.
+  /// hardware buttons moved it while we weren't looking. (Android only.)
   Future<void> refreshVolume() async {
+    if (!Plat.isAndroid) return;
     _volume = await DeviceMusic.getVolume();
     notifyListeners();
   }
 
   Future<void> setVolume(double value) async {
     _volume = value.clamp(0.0, 1.0);
-    await DeviceMusic.setVolume(_volume);
+    // On Android the slider drives the system media volume; on desktop there is
+    // no such channel, so we attenuate the player's own output instead.
+    if (Plat.isAndroid) {
+      await DeviceMusic.setVolume(_volume);
+    } else {
+      await _player.setVolume(_volume);
+    }
     notifyListeners();
   }
 
@@ -273,13 +283,15 @@ class PlayerController extends ChangeNotifier {
 
     final cover = store.coverPathOf(track);
 
-    // Keep the home-screen widget in step with the notification.
-    WidgetBridge.update(
-      title: track.title,
-      artist: track.artist,
-      coverPath: cover,
-      playing: playing,
-    );
+    // Keep the home-screen widget in step with the notification. (Android only.)
+    if (Plat.isAndroid) {
+      WidgetBridge.update(
+        title: track.title,
+        artist: track.artist,
+        coverPath: cover,
+        playing: playing,
+      );
+    }
 
     handler.mediaItem.add(MediaItem(
       id: track.id,

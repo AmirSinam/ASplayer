@@ -1,0 +1,43 @@
+name: بیلد ویندوز
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # پروژه پوشه‌ی windows/ را کامیت نکرده؛ اینجا ساخته می‌شود.
+      - name: ساخت اسکلت ویندوز
+        run: flutter create --platforms=windows .
+
+      - name: گرفتن بسته‌ها
+        run: flutter pub get
+
+      - name: بررسی کد
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: بیلد ویندوز
+        run: flutter build windows --release
+
+      # خروجی یک پوشه است (exe + کتابخانه‌ها + data). زیپش می‌کنیم.
+      - name: بسته‌بندی
+        run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath ASplayer-windows.zip
+
+      - name: آپلود خروجی
+        uses: actions/upload-artifact@v4
+        with:
+          name: ASplayer-windows
+          path: ASplayer-windows.zip
+          retention-days: 30

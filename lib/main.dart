@@ -6,6 +6,7 @@ import 'app_state.dart';
 import 'audio/player_controller.dart';
 import 'data/importer.dart';
 import 'data/library_store.dart';
+import 'platform.dart';
 import 'screens/root.dart';
 import 'theme.dart';
 
@@ -16,16 +17,20 @@ Future<void> main() async {
   final appState = await AppState.load();
   final controller = PlayerController(store);
 
-  final handler = await AudioService.init(
-    builder: () => ASAudioHandler(controller),
-    config: const AudioServiceConfig(
-      androidNotificationChannelId: 'ir.aspoormehr.asplayer.audio',
-      androidNotificationChannelName: 'ASplayer',
-      androidNotificationOngoing: true,
-      androidStopForegroundOnPause: true,
-    ),
-  );
-  controller.attach(handler);
+  // audio_service (the notification / lock-screen bridge) is mobile-only. On
+  // desktop the player runs fine without it — just no OS media controls.
+  if (Plat.isMobile) {
+    final handler = await AudioService.init(
+      builder: () => ASAudioHandler(controller),
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'ir.aspoormehr.asplayer.audio',
+        androidNotificationChannelName: 'ASplayer',
+        androidNotificationOngoing: true,
+        androidStopForegroundOnPause: true,
+      ),
+    );
+    controller.attach(handler);
+  }
 
   runApp(
     MultiProvider(

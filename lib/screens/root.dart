@@ -8,6 +8,7 @@ import '../app_state.dart';
 import '../audio/player_controller.dart';
 import '../data/device_music.dart';
 import '../data/importer.dart';
+import '../platform.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import 'favorites.dart';
@@ -55,8 +56,9 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
   }
 
   /// Files arriving from Telegram's share sheet, both while running and on a
-  /// cold start.
+  /// cold start. Mobile-only — the plugin has no desktop implementation.
   void _listenForSharedFiles() {
+    if (!Plat.isMobile) return;
     final importer = context.read<Importer>();
 
     _shareSub = ReceiveSharingIntent.instance.getMediaStream().listen((files) {
