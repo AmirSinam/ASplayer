@@ -1,0 +1,49 @@
+name: ساخت فایل نصبی اندروید
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: ساخت اسکلت اندروید
+        run: flutter create --org ir.aspoormehr --project-name asplayer --platforms=android .
+
+      # flutter create فایل‌های خودش را می‌نویسد؛ نسخه‌ی ما باید بعد از آن بنشیند.
+      - name: اعمال فایل‌های اندروید ما
+        run: |
+          cp android_overrides/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          mkdir -p android/app/src/main/kotlin/ir/aspoormehr/asplayer
+          cp android_overrides/MainActivity.kt android/app/src/main/kotlin/ir/aspoormehr/asplayer/MainActivity.kt
+          rm -f test/widget_test.dart
+
+      - name: گرفتن بسته‌ها
+        run: flutter pub get
+
+      - name: بررسی کد
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: بیلد فایل نصبی
+        run: flutter build apk --release
+
+      - name: آپلود خروجی
+        uses: actions/upload-artifact@v4
+        with:
+          name: asplayer-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30

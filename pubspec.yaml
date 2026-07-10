@@ -1,0 +1,36 @@
+name: asplayer
+description: ASplayer — keep your own songs, listen offline.
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # playback + background service
+  just_audio: ^0.9.42
+  audio_service: ^0.18.15
+  audio_session: ^0.1.21
+
+  # files, tags, storage
+  path_provider: ^2.1.4
+  path: ^1.9.0
+  file_picker: ^8.1.2
+  audiotags: ^1.4.4
+  receive_sharing_intent: ^1.8.0
+  shared_preferences: ^2.3.2
+
+  # about screen
+  url_launcher: ^6.3.0
+
+  # state
+  provider: ^6.1.2
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
