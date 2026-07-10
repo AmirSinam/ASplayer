@@ -21,22 +21,31 @@ class PlayerScreen extends StatefulWidget {
   State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderStateMixin {
+class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMixin {
   static const _speeds = [0.75, 1.0, 1.25, 1.5, 2.0];
   static const _sleepMinutes = [15, 30, 45, 60];
 
   // Drives the slow aura rotation behind the artwork.
   late final AnimationController _aura;
 
+  // Drives the gentle up-and-down float of the artwork.
+  late final AnimationController _float;
+
+  // Horizontal offset while the user is dragging the cover to change tracks.
+  double _dragX = 0;
+
   @override
   void initState() {
     super.initState();
     _aura = AnimationController(vsync: this, duration: const Duration(seconds: 12))..repeat();
+    _float = AnimationController(vsync: this, duration: const Duration(seconds: 4))
+      ..repeat(reverse: true);
   }
 
   @override
   void dispose() {
     _aura.dispose();
+    _float.dispose();
     super.dispose();
   }
 
@@ -62,7 +71,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
               child: Column(
                 children: [
                   _topBar(context, player, s, colors, track),
-                  Expanded(child: _artwork(track, player.playing)),
+                  Expanded(child: _artwork(track, player)),
                   if (player.sleepRemaining != null) _sleepBadge(s, player),
                   const SizedBox(height: 6),
                   _titleRow(track, s, colors, store),
@@ -125,65 +134,104 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     );
   }
 
-  // MARK: - Artwork with a rotating aura
+  // MARK: - Artwork: floating, with swipe-to-change
 
-  Widget _artwork(Track track, bool playing) {
+  void _onDragEnd(PlayerController player, double width) {
+    // A third of the way across, or a firm flick, commits to the next/previous.
+    final threshold = width * 0.28;
+    if (_dragX <= -threshold) {
+      player.next();
+    } else if (_dragX >= threshold) {
+      player.previous();
+    }
+    setState(() => _dragX = 0);
+  }
+
+  Widget _artwork(Track track, PlayerController player) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: AspectRatio(
           aspectRatio: 1,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // A soft tiffany halo that slowly turns while a song plays.
-              AnimatedBuilder(
-                animation: _aura,
-                builder: (context, child) => Transform.rotate(
-                  angle: _aura.value * 2 * pi,
-                  child: child,
-                ),
-                child: FractionallySizedBox(
-                  widthFactor: 1.06,
-                  heightFactor: 1.06,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(R.card + 16),
-                      gradient: SweepGradient(
-                        colors: [
-                          accent.withValues(alpha: 0.0),
-                          accent.withValues(alpha: 0.35),
-                          accent.withValues(alpha: 0.0),
-                          accent.withValues(alpha: 0.22),
-                          accent.withValues(alpha: 0.0),
-                        ],
-                        stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onHorizontalDragUpdate: (d) => setState(() => _dragX += d.delta.dx),
+                onHorizontalDragEnd: (_) => _onDragEnd(player, width),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // A soft tiffany halo that slowly turns while a song plays.
+                    AnimatedBuilder(
+                      animation: _aura,
+                      builder: (context, child) => Transform.rotate(
+                        angle: _aura.value * 2 * pi,
+                        child: child,
+                      ),
+                      child: FractionallySizedBox(
+                        widthFactor: 1.06,
+                        heightFactor: 1.06,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(R.card + 16),
+                            gradient: SweepGradient(
+                              colors: [
+                                accent.withValues(alpha: 0.0),
+                                accent.withValues(alpha: 0.35),
+                                accent.withValues(alpha: 0.0),
+                                accent.withValues(alpha: 0.22),
+                                accent.withValues(alpha: 0.0),
+                              ],
+                              stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ),
-              // The art itself breathes gently between tracks/pause states.
-              AnimatedScale(
-                scale: playing ? 1.0 : 0.94,
-                duration: const Duration(milliseconds: 400),
-                curve: Curves.easeOut,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(R.card),
-                    boxShadow: [
-                      BoxShadow(
-                        color: accent.withValues(alpha: 0.28),
-                        blurRadius: 48,
-                        spreadRadius: -8,
-                        offset: const Offset(0, 16),
+
+                    // The cover: floats up and down, follows the drag, tilts
+                    // slightly toward the direction it is being pulled, and
+                    // fades as it approaches the commit threshold.
+                    AnimatedBuilder(
+                      animation: _float,
+                      builder: (context, child) {
+                        final floatY = sin(_float.value * 2 * pi) * 8;
+                        final dragT = (_dragX / width).clamp(-1.0, 1.0);
+                        return Transform.translate(
+                          offset: Offset(_dragX, floatY),
+                          child: Transform.rotate(
+                            angle: dragT * 0.08,
+                            child: Opacity(opacity: 1 - dragT.abs() * 0.35, child: child),
+                          ),
+                        );
+                      },
+                      child: AnimatedScale(
+                        scale: player.playing ? 1.0 : 0.94,
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeOut,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(R.card),
+                            boxShadow: [
+                              BoxShadow(
+                                color: accent.withValues(alpha: 0.28),
+                                blurRadius: 48,
+                                spreadRadius: -8,
+                                offset: const Offset(0, 16),
+                              ),
+                            ],
+                          ),
+                          child: Artwork(track: track, radius: R.card),
+                        ),
                       ),
-                    ],
-                  ),
-                  child: Artwork(track: track, radius: R.card),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              );
+            },
           ),
         ),
       ),
