@@ -4,13 +4,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'l10n.dart';
 
 class AppState extends ChangeNotifier {
-  AppState._(this._prefs, this._lang, this._themeMode, this._onboarded);
+  AppState._(this._prefs, this._lang, this._themeMode, this._onboarded, this._deviceSync);
 
   final SharedPreferences _prefs;
 
   Lang _lang;
   ThemeMode _themeMode;
   bool _onboarded;
+  bool _deviceSync;
   int _tab = 0;
 
   /// English by default; Persian only if the user picks it.
@@ -26,13 +27,30 @@ class AppState extends ChangeNotifier {
       orElse: () => ThemeMode.system,
     );
 
-    return AppState._(prefs, lang, themeMode, prefs.getBool('onboarded') ?? false);
+    return AppState._(
+      prefs,
+      lang,
+      themeMode,
+      prefs.getBool('onboarded') ?? false,
+      prefs.getBool('deviceSync') ?? false,
+    );
   }
 
   Lang get lang => _lang;
   ThemeMode get themeMode => _themeMode;
   bool get onboarded => _onboarded;
   int get tab => _tab;
+
+  /// Once the user imports the phone's songs, we keep the library in sync with
+  /// whatever they add later (e.g. saving a track from Telegram into Music).
+  bool get deviceSyncEnabled => _deviceSync;
+
+  set deviceSyncEnabled(bool value) {
+    if (_deviceSync == value) return;
+    _deviceSync = value;
+    _prefs.setBool('deviceSync', value);
+    notifyListeners();
+  }
 
   Strings get s => _lang == Lang.fa ? Strings.fa : Strings.en;
 

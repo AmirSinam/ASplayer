@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -9,13 +11,34 @@ import '../models.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/track_sheet.dart';
+import '../widgets/waveform_bar.dart';
 import 'queue.dart';
 
-class PlayerScreen extends StatelessWidget {
+class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
 
+  @override
+  State<PlayerScreen> createState() => _PlayerScreenState();
+}
+
+class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderStateMixin {
   static const _speeds = [0.75, 1.0, 1.25, 1.5, 2.0];
   static const _sleepMinutes = [15, 30, 45, 60];
+
+  // Drives the slow aura rotation behind the artwork.
+  late final AnimationController _aura;
+
+  @override
+  void initState() {
+    super.initState();
+    _aura = AnimationController(vsync: this, duration: const Duration(seconds: 12))..repeat();
+  }
+
+  @override
+  void dispose() {
+    _aura.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -35,237 +58,20 @@ class PlayerScreen extends StatelessWidget {
           Positioned.fill(child: Backdrop(track: track)),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: Column(
                 children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: Icon(Icons.expand_more, color: colors.primaryText),
-                      ),
-                      const Spacer(),
-                      Text(
-                        s.nowPlaying,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: colors.primaryText,
-                        ),
-                      ),
-                      const Spacer(),
-                      PopupMenuButton<String>(
-                        icon: Icon(Icons.more_horiz, color: colors.primaryText),
-                        onSelected: (value) async {
-                          switch (value) {
-                            case 'queue':
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (_) => const QueueScreen()),
-                              );
-                            case 'playlist':
-                              showAddToPlaylist(context, track);
-                            case 'sleep':
-                              _showSleepSheet(context, player, s);
-                            case 'speed':
-                              _showSpeedSheet(context, player, s);
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          PopupMenuItem(value: 'queue', child: Text(s.queue)),
-                          PopupMenuItem(value: 'playlist', child: Text(s.addToPlaylist)),
-                          PopupMenuItem(value: 'sleep', child: Text(s.sleepTimer)),
-                          PopupMenuItem(value: 'speed', child: Text(s.playbackSpeed)),
-                        ],
-                      ),
-                    ],
-                  ),
-
-                  Expanded(
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: AspectRatio(
-                          aspectRatio: 1,
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(R.card),
-                              boxShadow: [
-                                BoxShadow(color: colors.shadow, blurRadius: 40, offset: const Offset(0, 18)),
-                              ],
-                            ),
-                            child: Artwork(track: track, radius: R.card),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  if (player.sleepRemaining != null)
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.16),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.bedtime, size: 14, color: accent),
-                          const SizedBox(width: 6),
-                          Text(
-                            s.sleepsIn(formatDuration(player.sleepRemaining!)),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: accent,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              track.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 21,
-                                fontWeight: FontWeight.w800,
-                                color: colors.primaryText,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              track.artistName(s),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 13, color: colors.secondaryText),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => store.toggleFavorite(track),
-                        icon: Icon(
-                          track.favorite ? Icons.favorite : Icons.favorite_border,
-                          color: track.favorite ? accent : colors.secondaryText,
-                        ),
-                      ),
-                    ],
-                  ),
+                  _topBar(context, player, s, colors, track),
+                  Expanded(child: _artwork(track, player.playing)),
+                  if (player.sleepRemaining != null) _sleepBadge(s, player),
                   const SizedBox(height: 6),
-
-                  StreamBuilder<Duration>(
-                    stream: player.positionStream,
-                    builder: (context, snapshot) {
-                      final position = snapshot.data ?? Duration.zero;
-                      final total = player.duration;
-                      final progress = total.inMilliseconds == 0
-                          ? 0.0
-                          : position.inMilliseconds / total.inMilliseconds;
-
-                      return Column(
-                        children: [
-                          ScrubBar(progress: progress, onScrub: player.seekToFraction),
-                          Directionality(
-                            textDirection: TextDirection.ltr,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  formatDuration(position),
-                                  style: TextStyle(fontSize: 11.5, color: colors.secondaryText),
-                                ),
-                                if (player.speed != 1)
-                                  Text(
-                                    '${player.speed}×',
-                                    style: const TextStyle(fontSize: 11.5, color: accent),
-                                  ),
-                                Text(
-                                  formatDuration(total),
-                                  style: TextStyle(fontSize: 11.5, color: colors.secondaryText),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 6),
-
-                  Directionality(
-                    textDirection: TextDirection.ltr,
-                    child: Row(
-                      children: [
-                        Icon(Icons.volume_down, size: 18, color: colors.secondaryText),
-                        Expanded(
-                          child: ScrubBar(
-                            progress: player.volume,
-                            onScrub: player.setVolume,
-                            thumb: true,
-                          ),
-                        ),
-                        Icon(Icons.volume_up, size: 18, color: colors.secondaryText),
-                      ],
-                    ),
-                  ),
+                  _titleRow(track, s, colors, store),
                   const SizedBox(height: 14),
-
-                  Glass(
-                    radius: 999,
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        IconButton(
-                          onPressed: player.toggleShuffle,
-                          icon: Icon(
-                            Icons.shuffle,
-                            color: player.shuffle ? accent : colors.secondaryText,
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: player.previous,
-                          iconSize: 30,
-                          icon: Icon(Icons.skip_previous, color: colors.primaryText),
-                        ),
-                        GestureDetector(
-                          onTap: player.toggle,
-                          child: Container(
-                            width: 64,
-                            height: 64,
-                            decoration: const BoxDecoration(color: accent, shape: BoxShape.circle),
-                            child: Icon(
-                              player.playing ? Icons.pause : Icons.play_arrow,
-                              color: onAccent,
-                              size: 30,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: player.next,
-                          iconSize: 30,
-                          icon: Icon(Icons.skip_next, color: colors.primaryText),
-                        ),
-                        IconButton(
-                          onPressed: player.cycleRepeat,
-                          icon: Icon(
-                            player.repeat == Repeat.one ? Icons.repeat_one : Icons.repeat,
-                            color: player.repeat == Repeat.off ? colors.secondaryText : accent,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  _seek(player, s, colors, track),
+                  const SizedBox(height: 12),
+                  _volume(player, colors),
+                  const SizedBox(height: 16),
+                  _controls(player, colors),
                 ],
               ),
             ),
@@ -274,6 +80,295 @@ class PlayerScreen extends StatelessWidget {
       ),
     );
   }
+
+  // MARK: - Top bar
+
+  Widget _topBar(BuildContext context, PlayerController player, Strings s,
+      AppColors colors, Track track) {
+    return Row(
+      children: [
+        IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: Icon(Icons.expand_more, color: colors.primaryText),
+        ),
+        const Spacer(),
+        Text(
+          s.nowPlaying,
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colors.primaryText),
+        ),
+        const Spacer(),
+        PopupMenuButton<String>(
+          icon: Icon(Icons.more_horiz, color: colors.primaryText),
+          onSelected: (value) async {
+            switch (value) {
+              case 'queue':
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const QueueScreen()),
+                );
+              case 'playlist':
+                showAddToPlaylist(context, track);
+              case 'sleep':
+                _showSleepSheet(context, player, s);
+              case 'speed':
+                _showSpeedSheet(context, player, s);
+            }
+          },
+          itemBuilder: (context) => [
+            PopupMenuItem(value: 'queue', child: Text(s.queue)),
+            PopupMenuItem(value: 'playlist', child: Text(s.addToPlaylist)),
+            PopupMenuItem(value: 'sleep', child: Text(s.sleepTimer)),
+            PopupMenuItem(value: 'speed', child: Text(s.playbackSpeed)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // MARK: - Artwork with a rotating aura
+
+  Widget _artwork(Track track, bool playing) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: AspectRatio(
+          aspectRatio: 1,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // A soft tiffany halo that slowly turns while a song plays.
+              AnimatedBuilder(
+                animation: _aura,
+                builder: (context, child) => Transform.rotate(
+                  angle: _aura.value * 2 * pi,
+                  child: child,
+                ),
+                child: FractionallySizedBox(
+                  widthFactor: 1.06,
+                  heightFactor: 1.06,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(R.card + 16),
+                      gradient: SweepGradient(
+                        colors: [
+                          accent.withValues(alpha: 0.0),
+                          accent.withValues(alpha: 0.35),
+                          accent.withValues(alpha: 0.0),
+                          accent.withValues(alpha: 0.22),
+                          accent.withValues(alpha: 0.0),
+                        ],
+                        stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // The art itself breathes gently between tracks/pause states.
+              AnimatedScale(
+                scale: playing ? 1.0 : 0.94,
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeOut,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(R.card),
+                    boxShadow: [
+                      BoxShadow(
+                        color: accent.withValues(alpha: 0.28),
+                        blurRadius: 48,
+                        spreadRadius: -8,
+                        offset: const Offset(0, 16),
+                      ),
+                    ],
+                  ),
+                  child: Artwork(track: track, radius: R.card),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // MARK: - Sleep badge
+
+  Widget _sleepBadge(Strings s, PlayerController player) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.bedtime, size: 14, color: accent),
+          const SizedBox(width: 6),
+          Text(
+            s.sleepsIn(formatDuration(player.sleepRemaining!)),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: accent),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // MARK: - Title + favourite
+
+  Widget _titleRow(Track track, Strings s, AppColors colors, LibraryStore store) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                track.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: colors.primaryText,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                track.artistName(s),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 13.5, color: colors.secondaryText),
+              ),
+            ],
+          ),
+        ),
+        _HeartButton(track: track, store: store),
+      ],
+    );
+  }
+
+  // MARK: - Waveform seek
+
+  Widget _seek(PlayerController player, Strings s, AppColors colors, Track track) {
+    return StreamBuilder<Duration>(
+      stream: player.positionStream,
+      builder: (context, snapshot) {
+        final position = snapshot.data ?? Duration.zero;
+        final total = player.duration;
+        final progress =
+            total.inMilliseconds == 0 ? 0.0 : position.inMilliseconds / total.inMilliseconds;
+
+        return Column(
+          children: [
+            WaveformBar(
+              seed: track.id.hashCode,
+              progress: progress,
+              playing: player.playing,
+              onSeek: player.seekToFraction,
+            ),
+            const SizedBox(height: 6),
+            Directionality(
+              textDirection: TextDirection.ltr,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    formatDuration(position),
+                    style: TextStyle(fontSize: 11.5, color: colors.secondaryText),
+                  ),
+                  if (player.speed != 1)
+                    Text('${player.speed}×',
+                        style: const TextStyle(fontSize: 11.5, color: accent)),
+                  Text(
+                    formatDuration(total),
+                    style: TextStyle(fontSize: 11.5, color: colors.secondaryText),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // MARK: - Volume
+
+  Widget _volume(PlayerController player, AppColors colors) {
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Row(
+        children: [
+          Icon(Icons.volume_down, size: 18, color: colors.secondaryText),
+          Expanded(
+            child: ScrubBar(progress: player.volume, onScrub: player.setVolume),
+          ),
+          Icon(Icons.volume_up, size: 18, color: colors.secondaryText),
+        ],
+      ),
+    );
+  }
+
+  // MARK: - Transport controls
+
+  Widget _controls(PlayerController player, AppColors colors) {
+    return Glass(
+      radius: 999,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            onPressed: player.toggleShuffle,
+            icon: Icon(Icons.shuffle, color: player.shuffle ? accent : colors.secondaryText),
+          ),
+          IconButton(
+            onPressed: player.previous,
+            iconSize: 32,
+            icon: Icon(Icons.skip_previous, color: colors.primaryText),
+          ),
+          GestureDetector(
+            onTap: player.toggle,
+            child: Container(
+              width: 66,
+              height: 66,
+              decoration: BoxDecoration(
+                color: accent,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.45),
+                    blurRadius: 20,
+                    spreadRadius: -2,
+                  ),
+                ],
+              ),
+              child: Icon(
+                player.playing ? Icons.pause : Icons.play_arrow,
+                color: onAccent,
+                size: 32,
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: player.next,
+            iconSize: 32,
+            icon: Icon(Icons.skip_next, color: colors.primaryText),
+          ),
+          IconButton(
+            onPressed: player.cycleRepeat,
+            icon: Icon(
+              player.repeat == Repeat.one ? Icons.repeat_one : Icons.repeat,
+              color: player.repeat == Repeat.off ? colors.secondaryText : accent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // MARK: - Sheets
 
   void _showSleepSheet(BuildContext context, PlayerController player, Strings s) {
     showModalBottomSheet<void>(
@@ -329,6 +424,26 @@ class PlayerScreen extends StatelessWidget {
                   ))
               .toList(),
         ),
+      ),
+    );
+  }
+}
+
+class _HeartButton extends StatelessWidget {
+  const _HeartButton({required this.track, required this.store});
+
+  final Track track;
+  final LibraryStore store;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return IconButton(
+      onPressed: () => store.toggleFavorite(track),
+      iconSize: 26,
+      icon: Icon(
+        track.favorite ? Icons.favorite : Icons.favorite_border,
+        color: track.favorite ? accent : colors.secondaryText,
       ),
     );
   }

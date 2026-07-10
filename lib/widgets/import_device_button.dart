@@ -59,6 +59,9 @@ class _ImportDeviceButtonState extends State<ImportDeviceButton> {
       },
     );
 
+    // From now on, keep the library in step with the phone's music folder.
+    app.deviceSyncEnabled = true;
+
     if (!mounted) return;
     setState(() => _busy = false);
     messenger.showSnackBar(SnackBar(content: Text(s.imported(added))));

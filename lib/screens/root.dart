@@ -6,6 +6,7 @@ import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 import '../app_state.dart';
 import '../audio/player_controller.dart';
+import '../data/device_music.dart';
 import '../data/importer.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -23,13 +24,34 @@ class RootScreen extends StatefulWidget {
   State<RootScreen> createState() => _RootScreenState();
 }
 
-class _RootScreenState extends State<RootScreen> {
+class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
   StreamSubscription<List<SharedMediaFile>>? _shareSub;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _listenForSharedFiles();
+    _syncDeviceSongs();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Coming back from Telegram after saving a song into Music is the main case:
+    // pick up anything new without the user asking.
+    if (state == AppLifecycleState.resumed) _syncDeviceSongs();
+  }
+
+  /// Silently links songs added to the phone since last time. Only runs once the
+  /// user has opted in by importing the phone's library at least once.
+  Future<void> _syncDeviceSongs() async {
+    final app = context.read<AppState>();
+    if (!app.deviceSyncEnabled) return;
+    if (!await DeviceMusic.hasPermission()) return;
+
+    final songs = await DeviceMusic.scan();
+    if (songs.isEmpty || !mounted) return;
+    await context.read<Importer>().linkDeviceSongs(songs);
   }
 
   /// Files arriving from Telegram's share sheet, both while running and on a
@@ -50,6 +72,7 @@ class _RootScreenState extends State<RootScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _shareSub?.cancel();
     super.dispose();
   }
