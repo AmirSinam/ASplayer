@@ -1,0 +1,4 @@
+# gradlew runs on the Linux CI runner: it must keep LF endings and stay executable.
+android/gradlew text eol=lf
+*.jar binary
+*.sh text eol=lf

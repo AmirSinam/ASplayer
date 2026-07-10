@@ -1,8 +1,7 @@
-gradle-wrapper.jar
+# The Gradle wrapper is committed on purpose: without gradlew and its jar,
+# a fresh clone (and every CI build) has no way to run Gradle at all.
 /.gradle
 /captures/
-/gradlew
-/gradlew.bat
 /local.properties
 GeneratedPluginRegistrant.java
 .cxx/
