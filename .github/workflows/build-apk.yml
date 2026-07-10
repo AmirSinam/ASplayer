@@ -52,7 +52,19 @@ jobs:
       - name: بیلد فایل نصبی
         env:
           ANDROID_KEYSTORE_PATH: ${{ steps.keystore.outputs.path }}
-        run: flutter build apk --release
+        run: |
+          set -o pipefail
+          flutter build apk --release 2>&1 | tee build.log
+
+      # لاگ کامل بدون توکن قابل دانلود نیست، ولی حاشیه‌نویسی‌ها هستند.
+      # پس متن خطا را به‌صورت حاشیه‌نویسی بیرون می‌دهیم.
+      - name: بیرون دادن متن خطا
+        if: failure()
+        run: |
+          msg=$(tail -n 60 build.log \
+            | sed -e 's/%/%25/g' -e 's/\r//g' \
+            | awk '{ printf "%s%%0A", $0 }')
+          echo "::error title=خطای بیلد::${msg}"
 
       # بسته‌ی گوگل‌پلی. فقط وقتی کلید واقعی داریم معنا دارد.
       - name: بیلد بسته‌ی گوگل‌پلی
