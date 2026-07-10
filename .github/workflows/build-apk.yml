@@ -1,13 +1,21 @@
-name: ساخت فایل نصبی اندروید
+name: بیلد و انتشار
 
 on:
   workflow_dispatch:
   push:
     branches: [main]
+    tags: ["v*"]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    # سکرت‌ها را نمی‌شود مستقیم در `if` بررسی کرد، پس اول به env می‌آیند.
+    env:
+      KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4
@@ -20,17 +28,7 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-
-      - name: ساخت اسکلت اندروید
-        run: flutter create --org ir.aspoormehr --project-name asplayer --platforms=android .
-
-      # flutter create فایل‌های خودش را می‌نویسد؛ نسخه‌ی ما باید بعد از آن بنشیند.
-      - name: اعمال فایل‌های اندروید ما
-        run: |
-          cp android_overrides/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
-          mkdir -p android/app/src/main/kotlin/ir/aspoormehr/asplayer
-          cp android_overrides/MainActivity.kt android/app/src/main/kotlin/ir/aspoormehr/asplayer/MainActivity.kt
-          rm -f test/widget_test.dart
+          cache: true
 
       - name: گرفتن بسته‌ها
         run: flutter pub get
@@ -38,12 +36,42 @@ jobs:
       - name: بررسی کد
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
+      # اگر سکرت‌ها تنظیم نشده باشند، بیلد با کلید اشکال‌زدایی ادامه می‌دهد
+      # و هشدار می‌دهد که این خروجی قابل انتشار نیست.
+      - name: بازگشایی کلید امضا
+        id: keystore
+        if: env.KEYSTORE_BASE64 != ''
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "path=$RUNNER_TEMP/release.jks" >> "$GITHUB_OUTPUT"
+
+      - name: هشدار اگر امضا واقعی نبود
+        if: env.KEYSTORE_BASE64 == ''
+        run: echo "::warning::سکرت‌های امضا تنظیم نشده‌اند. خروجی با کلید اشکال‌زدایی امضا می‌شود و قابل انتشار نیست."
+
       - name: بیلد فایل نصبی
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ steps.keystore.outputs.path }}
         run: flutter build apk --release
 
-      - name: آپلود خروجی
+      # بسته‌ی گوگل‌پلی. فقط وقتی کلید واقعی داریم معنا دارد.
+      - name: بیلد بسته‌ی گوگل‌پلی
+        if: env.KEYSTORE_BASE64 != ''
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ steps.keystore.outputs.path }}
+        run: flutter build appbundle --release
+
+      - name: آپلود فایل نصبی
         uses: actions/upload-artifact@v4
         with:
           name: asplayer-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+      - name: آپلود بسته‌ی گوگل‌پلی
+        if: env.KEYSTORE_BASE64 != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: asplayer-aab
+          path: build/app/outputs/bundle/release/app-release.aab
           retention-days: 30
