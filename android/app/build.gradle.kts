@@ -2,7 +2,9 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    // AGP 8 has no built-in Kotlin, so MainActivity.kt needs the Kotlin plugin
+    // applied explicitly. The Flutter plugin must come after both.
+    id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
 }
 
