@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 /// Tiffany reads well on both grounds, so the accent never changes.
@@ -23,12 +21,14 @@ class AppColors {
   final Color rim;
   final Color shadow;
 
+  // Glass is a touch more opaque than before: without a live blur softening the
+  // background, a stronger fill keeps cards defined and text readable.
   static const dark = AppColors(
     background: Color(0xFF080808),
     primaryText: Colors.white,
     secondaryText: Color(0x8CFFFFFF),
-    glass: Color(0x12FFFFFF),
-    rim: Color(0x2EFFFFFF),
+    glass: Color(0x1FFFFFFF),
+    rim: Color(0x33FFFFFF),
     shadow: Color(0x80000000),
   );
 
@@ -36,8 +36,8 @@ class AppColors {
     background: Color(0xFFF2F4F4),
     primaryText: Color(0xFF0B1211),
     secondaryText: Color(0x850B1211),
-    glass: Color(0x99FFFFFF),
-    rim: Color(0xE6FFFFFF),
+    glass: Color(0xB3FFFFFF),
+    rim: Color(0xFFFFFFFF),
     shadow: Color(0x1F0B1211),
   );
 
@@ -69,8 +69,13 @@ class R {
   static const row = 14.0;
 }
 
-/// Material, a tint with some body, a specular rim, and a soft drop shadow.
-/// Every raised surface in the app sits on this.
+/// A frosted surface: a translucent fill with a soft top-light sheen, a
+/// specular rim, and an optional drop shadow.
+///
+/// It deliberately does NOT use a live `BackdropFilter`. A real per-surface blur
+/// is one of the most expensive things in Flutter, and the app draws dozens of
+/// these at once — that was the main source of jank. The app already sits on a
+/// heavily blurred backdrop, so a translucent fill reads as glass on its own.
 class Glass extends StatelessWidget {
   const Glass({
     super.key,
@@ -78,42 +83,42 @@ class Glass extends StatelessWidget {
     this.radius = R.card,
     this.elevated = true,
     this.padding,
-    this.blur = 24,
   });
 
   final Widget child;
   final double radius;
   final bool elevated;
   final EdgeInsets? padding;
-  final double blur;
 
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
     final shape = BorderRadius.circular(radius);
+    final dark = Theme.of(context).brightness == Brightness.dark;
 
-    return DecoratedBox(
+    return Container(
+      padding: padding,
       decoration: BoxDecoration(
         borderRadius: shape,
+        border: Border.all(color: colors.rim, width: 0.9),
         boxShadow: elevated
-            ? [BoxShadow(color: colors.shadow, blurRadius: 24, offset: const Offset(0, 10))]
+            ? [BoxShadow(color: colors.shadow, blurRadius: 22, offset: const Offset(0, 10))]
             : const [],
-      ),
-      child: ClipRRect(
-        borderRadius: shape,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
-          child: Container(
-            padding: padding,
-            decoration: BoxDecoration(
-              color: colors.glass,
-              borderRadius: shape,
-              border: Border.all(color: colors.rim, width: 0.9),
-            ),
-            child: child,
-          ),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: dark
+              ? [
+                  colors.glass,
+                  Color.alphaBlend(Colors.white.withValues(alpha: 0.04), colors.glass),
+                ]
+              : [
+                  Color.alphaBlend(Colors.white.withValues(alpha: 0.30), colors.glass),
+                  colors.glass,
+                ],
         ),
       ),
+      child: child,
     );
   }
 }

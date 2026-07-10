@@ -40,6 +40,10 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
     _aura = AnimationController(vsync: this, duration: const Duration(seconds: 12))..repeat();
     _float = AnimationController(vsync: this, duration: const Duration(seconds: 4))
       ..repeat(reverse: true);
+    // The hardware buttons may have moved the volume since we last looked.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<PlayerController>().refreshVolume();
+    });
   }
 
   @override
@@ -165,7 +169,8 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                   alignment: Alignment.center,
                   children: [
                     // A soft tiffany halo that slowly turns while a song plays.
-                    AnimatedBuilder(
+                    RepaintBoundary(
+                      child: AnimatedBuilder(
                       animation: _aura,
                       builder: (context, child) => Transform.rotate(
                         angle: _aura.value * 2 * pi,
@@ -190,6 +195,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                           ),
                         ),
                       ),
+                    ),
                     ),
 
                     // The cover: floats up and down, follows the drag, tilts
@@ -309,11 +315,13 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
 
         return Column(
           children: [
-            WaveformBar(
-              seed: track.id.hashCode,
-              progress: progress,
-              playing: player.playing,
-              onSeek: player.seekToFraction,
+            RepaintBoundary(
+              child: WaveformBar(
+                seed: track.id.hashCode,
+                progress: progress,
+                playing: player.playing,
+                onSeek: player.seekToFraction,
+              ),
             ),
             const SizedBox(height: 6),
             Directionality(

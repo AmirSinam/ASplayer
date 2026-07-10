@@ -5,6 +5,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
+import '../data/device_music.dart';
 import '../data/library_store.dart';
 import '../data/widget_bridge.dart';
 import '../models.dart';
@@ -18,6 +19,11 @@ class PlayerController extends ChangeNotifier {
         _advance(auto: true);
       }
       _publish();
+      notifyListeners();
+    });
+    // Start the slider matching the phone's current media volume.
+    DeviceMusic.getVolume().then((v) {
+      _volume = v;
       notifyListeners();
     });
   }
@@ -34,6 +40,9 @@ class PlayerController extends ChangeNotifier {
   bool _shuffle = false;
   Repeat _repeat = Repeat.off;
   double _speed = 1;
+  // Mirrors the system media volume so the on-screen slider matches the
+  // hardware buttons; the decoder itself always runs at full level.
+  double _volume = 1;
   Timer? _sleepTimer;
   Duration? _sleepRemaining;
 
@@ -43,7 +52,7 @@ class PlayerController extends ChangeNotifier {
   bool get shuffle => _shuffle;
   Repeat get repeat => _repeat;
   double get speed => _speed;
-  double get volume => _player.volume;
+  double get volume => _volume;
   Duration? get sleepRemaining => _sleepRemaining;
 
   Stream<Duration> get positionStream => _player.positionStream;
@@ -109,8 +118,16 @@ class PlayerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Re-reads the system volume — call when the player opens, in case the
+  /// hardware buttons moved it while we weren't looking.
+  Future<void> refreshVolume() async {
+    _volume = await DeviceMusic.getVolume();
+    notifyListeners();
+  }
+
   Future<void> setVolume(double value) async {
-    await _player.setVolume(value.clamp(0.0, 1.0));
+    _volume = value.clamp(0.0, 1.0);
+    await DeviceMusic.setVolume(_volume);
     notifyListeners();
   }
 

@@ -63,4 +63,26 @@ class DeviceMusic {
       return const [];
     }
   }
+
+  /// Current system media volume, 0..1. Falls back to 1 off-Android.
+  static Future<double> getVolume() async {
+    try {
+      return (await _channel.invokeMethod<double>('getVolume')) ?? 1.0;
+    } on PlatformException {
+      return 1.0;
+    } on MissingPluginException {
+      return 1.0;
+    }
+  }
+
+  /// Sets the system media volume — the same one the hardware buttons move.
+  static Future<void> setVolume(double fraction) async {
+    try {
+      await _channel.invokeMethod('setVolume', fraction);
+    } on PlatformException {
+      // ignore
+    } on MissingPluginException {
+      // ignore
+    }
+  }
 }

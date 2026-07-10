@@ -1,7 +1,9 @@
 package ir.aspoormehr.asplayer
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.os.Build
 import android.provider.MediaStore
 import com.ryanheise.audioservice.AudioServiceActivity
@@ -38,8 +40,32 @@ class MainActivity : AudioServiceActivity() {
             "hasPermission" -> result.success(hasAudioPermission())
             "requestPermission" -> requestAudioPermission(result)
             "scan" -> scanInBackground(result)
+            "getVolume" -> result.success(musicVolume())
+            "setVolume" -> {
+                setMusicVolume((call.arguments as? Double) ?: 1.0)
+                result.success(null)
+            }
             else -> result.notImplemented()
         }
+    }
+
+    // MARK: - System media volume
+
+    private fun audioManager(): AudioManager =
+        getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+    private fun musicVolume(): Double {
+        val am = audioManager()
+        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        if (max == 0) return 0.0
+        return am.getStreamVolume(AudioManager.STREAM_MUSIC).toDouble() / max
+    }
+
+    private fun setMusicVolume(fraction: Double) {
+        val am = audioManager()
+        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val index = (fraction.coerceIn(0.0, 1.0) * max).toInt()
+        am.setStreamVolume(AudioManager.STREAM_MUSIC, index, 0)
     }
 
     // MARK: - Permission

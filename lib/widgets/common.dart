@@ -72,18 +72,29 @@ class Backdrop extends StatelessWidget {
       );
     }
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        ColoredBox(color: colors.background),
-        ImageFiltered(
-          imageFilter: ImageFilter.blur(sigmaX: 60, sigmaY: 60),
-          child: Opacity(
-            opacity: Theme.of(context).brightness == Brightness.dark ? 0.5 : 0.3,
-            child: Image.file(file, fit: BoxFit.cover, gaplessPlayback: true),
+    // Decode the cover tiny, then let BoxFit stretch it — a 32px image scaled to
+    // full screen is already a smooth blur, so the expensive large-sigma filter
+    // isn't needed. RepaintBoundary keeps it off the per-frame repaint path.
+    return RepaintBoundary(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ColoredBox(color: colors.background),
+          ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+            child: Opacity(
+              opacity: Theme.of(context).brightness == Brightness.dark ? 0.5 : 0.3,
+              child: Image.file(
+                file,
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+                cacheWidth: 32,
+                filterQuality: FilterQuality.low,
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
