@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:audiotags/audiotags.dart';
+import 'package:audio_metadata_reader/audio_metadata_reader.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 
@@ -64,20 +64,22 @@ class Importer {
     String? coverName;
 
     try {
-      final tag = await AudioTags.read(file.path);
-      if (tag != null) {
-        if (tag.title != null && tag.title!.trim().isNotEmpty) title = tag.title!.trim();
-        artist = tag.trackArtist?.trim() ?? '';
-        album = tag.album?.trim() ?? '';
-        durationMs = (tag.duration ?? 0) * 1000;
+      final tags = readMetadata(file, getImage: true);
 
-        if (tag.pictures.isNotEmpty) {
-          coverName = '$id.img';
-          await File(p.join(store.coversDir.path, coverName)).writeAsBytes(tag.pictures.first.bytes);
-        }
+      final tagTitle = tags.title?.trim();
+      if (tagTitle != null && tagTitle.isNotEmpty) title = tagTitle;
+
+      artist = tags.artist?.trim() ?? '';
+      album = tags.album?.trim() ?? '';
+      durationMs = tags.duration?.inMilliseconds ?? 0;
+
+      if (tags.pictures.isNotEmpty) {
+        coverName = '$id.img';
+        await File(p.join(store.coversDir.path, coverName))
+            .writeAsBytes(tags.pictures.first.bytes);
       }
     } catch (_) {
-      // A file with unreadable tags is still a playable file.
+      // A file with unreadable or missing tags is still a playable file.
     }
 
     return Track(
