@@ -55,6 +55,8 @@ jobs:
         run: |
           set -o pipefail
           flutter build apk --release 2>&1 | tee build.log
+          # نام تمیز برای دانلود و پخش در تلگرام
+          cp build/app/outputs/flutter-apk/app-release.apk ASplayer.apk
 
       # لاگ کامل بدون توکن قابل دانلود نیست، ولی حاشیه‌نویسی‌ها هستند.
       # پس متن خطا را به‌صورت حاشیه‌نویسی بیرون می‌دهیم.
@@ -76,8 +78,8 @@ jobs:
       - name: آپلود فایل نصبی
         uses: actions/upload-artifact@v4
         with:
-          name: asplayer-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: ASplayer
+          path: ASplayer.apk
           retention-days: 30
 
       - name: آپلود بسته‌ی گوگل‌پلی
