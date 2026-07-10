@@ -87,6 +87,13 @@ class Strings {
     required this.appearanceSystem,
     required this.appearanceLight,
     required this.appearanceDark,
+    required this.importFromPhone,
+    required this.importFromPhoneBody,
+    required this.scanningPhone,
+    required this.noSongsOnPhone,
+    required this.permissionNeeded,
+    required this.importing,
+    required this.imported,
     required this.about,
     required this.aboutTagline,
     required this.developedBy,
@@ -117,6 +124,9 @@ class Strings {
   final String settings, trackCount, storageUsed;
   final String howToAdd, howToAddBody, backgroundPlay, backgroundPlayBody;
   final String language, appearance, appearanceSystem, appearanceLight, appearanceDark;
+  final String importFromPhone, importFromPhoneBody, scanningPhone;
+  final String noSongsOnPhone, permissionNeeded, importing;
+  final String Function(int) imported;
   final String about, aboutTagline, developedBy, visitWebsite, versionLabel;
   final String unknownArtist, noAlbum;
 
@@ -197,6 +207,14 @@ class Strings {
     appearanceSystem: 'System',
     appearanceLight: 'Light',
     appearanceDark: 'Dark',
+    importFromPhone: 'Import songs from this phone',
+    importFromPhoneBody:
+        'Adds every song already on your phone. Files are not copied — they stay where they are, and removing a song here never deletes it.',
+    scanningPhone: 'Looking for songs…',
+    noSongsOnPhone: 'No songs found on this phone',
+    permissionNeeded: 'ASplayer needs permission to read your music',
+    importing: 'Adding songs…',
+    imported: _enImported,
     about: 'About',
     aboutTagline: 'Your own music, on your own phone. No account, no ads, no internet.',
     developedBy: 'Built by',
@@ -282,6 +300,14 @@ class Strings {
     appearanceSystem: 'سیستم',
     appearanceLight: 'روشن',
     appearanceDark: 'تیره',
+    importFromPhone: 'وارد کردن آهنگ‌های گوشی',
+    importFromPhoneBody:
+        'همه‌ی آهنگ‌هایی که روی گوشی داری اضافه می‌شوند. فایل‌ها کپی نمی‌شوند — سر جایشان می‌مانند، و حذف آهنگ از اینجا هرگز فایل اصلی را پاک نمی‌کند.',
+    scanningPhone: 'در حال جست‌وجوی آهنگ‌ها…',
+    noSongsOnPhone: 'آهنگی روی این گوشی پیدا نشد',
+    permissionNeeded: 'ASplayer برای خواندن موزیک‌هایت به اجازه نیاز دارد',
+    importing: 'در حال افزودن آهنگ‌ها…',
+    imported: _faImported,
     about: 'درباره',
     aboutTagline: 'موزیک خودت، روی گوشی خودت. بدون حساب کاربری، بدون تبلیغات، بدون اینترنت.',
     developedBy: 'ساخته‌ی',
@@ -297,12 +323,14 @@ class Strings {
   );
 }
 
+String _enImported(int n) => '$n songs added';
 String _enSongs(int n) => '$n songs';
 String _enSongsInLibrary(int n) => '$n songs in your library';
 String _enMinutes(int n) => '$n minutes';
 String _enSleepsIn(String t) => 'Stops in $t';
 String _enTotal(int m) => m < 60 ? '$m min' : '${m ~/ 60} h ${m % 60} min';
 
+String _faImported(int n) => '$n آهنگ اضافه شد';
 String _faSongs(int n) => '$n آهنگ';
 String _faSongsInLibrary(int n) => '$n آهنگ در کتابخانه‌ات';
 String _faMinutes(int n) => '$n دقیقه';

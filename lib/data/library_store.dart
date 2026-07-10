@@ -35,7 +35,13 @@ class LibraryStore extends ChangeNotifier {
     return store;
   }
 
-  String filePathOf(Track track) => p.join(mediaDir.path, track.fileName);
+  /// Linked tracks play straight out of the phone's music folder; imported ones
+  /// live in our own directory.
+  String filePathOf(Track track) =>
+      track.externalPath ?? p.join(mediaDir.path, track.fileName);
+
+  bool hasTrackForPath(String externalPath) =>
+      _tracks.any((t) => t.externalPath == externalPath);
 
   String? coverPathOf(Track track) =>
       track.coverName == null ? null : p.join(coversDir.path, track.coverName!);
@@ -57,9 +63,13 @@ class LibraryStore extends ChangeNotifier {
     await save();
   }
 
+  /// Removes the track from the library. A linked file belongs to the user and
+  /// is left exactly where it is — only copies we made are deleted.
   Future<void> delete(Track track) async {
-    final file = File(filePathOf(track));
-    if (await file.exists()) await file.delete();
+    if (!track.isLinked) {
+      final file = File(filePathOf(track));
+      if (await file.exists()) await file.delete();
+    }
 
     final cover = coverPathOf(track);
     if (cover != null) {

@@ -8,6 +8,7 @@ class Track {
     required this.album,
     required this.durationMs,
     required this.fileName,
+    this.externalPath,
     this.coverName,
     required this.addedAt,
     this.lastPlayedAt,
@@ -27,6 +28,12 @@ class Track {
   /// Relative to the app's media directory. Never store an absolute path:
   /// on Android the app directory changes between installs.
   final String fileName;
+
+  /// Set when the song lives in the phone's own music folder and was linked
+  /// rather than copied. The file belongs to the user, not to this app: we read
+  /// it, and removing the track from the library must never delete it.
+  final String? externalPath;
+
   String? coverName;
 
   final DateTime addedAt;
@@ -35,6 +42,8 @@ class Track {
   bool favorite;
 
   Duration get duration => Duration(milliseconds: durationMs);
+
+  bool get isLinked => externalPath != null;
 
   String artistName(Strings s) => artist.isEmpty ? s.unknownArtist : artist;
   String albumName(Strings s) => album.isEmpty ? s.noAlbum : album;
@@ -46,6 +55,7 @@ class Track {
         'album': album,
         'durationMs': durationMs,
         'fileName': fileName,
+        'externalPath': externalPath,
         'coverName': coverName,
         'addedAt': addedAt.toIso8601String(),
         'lastPlayedAt': lastPlayedAt?.toIso8601String(),
@@ -60,6 +70,7 @@ class Track {
         album: json['album'] as String? ?? '',
         durationMs: json['durationMs'] as int? ?? 0,
         fileName: json['fileName'] as String,
+        externalPath: json['externalPath'] as String?,
         coverName: json['coverName'] as String?,
         addedAt: DateTime.parse(json['addedAt'] as String),
         lastPlayedAt: json['lastPlayedAt'] == null

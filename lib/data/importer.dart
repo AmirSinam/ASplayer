@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 
 import '../models.dart';
+import 'device_music.dart';
 import 'library_store.dart';
 
 class Importer {
@@ -48,6 +49,56 @@ class Importer {
       added++;
     }
 
+    return added;
+  }
+
+  /// Links songs the phone already holds. Nothing is copied: a linked track
+  /// plays straight out of the user's own music folder.
+  ///
+  /// Cover art is not in the media database, so it is pulled from each file's
+  /// tags — which is why this reports progress instead of blocking.
+  Future<int> linkDeviceSongs(
+    List<DeviceSong> songs, {
+    void Function(int done, int total)? onProgress,
+  }) async {
+    var added = 0;
+
+    for (var i = 0; i < songs.length; i++) {
+      final song = songs[i];
+      onProgress?.call(i, songs.length);
+
+      if (store.hasTrackForPath(song.path)) continue;
+      final file = File(song.path);
+      if (!await file.exists()) continue;
+
+      final id = '${DateTime.now().microsecondsSinceEpoch}_$added';
+      String? coverName;
+      try {
+        final tags = readMetadata(file, getImage: true);
+        if (tags.pictures.isNotEmpty) {
+          coverName = '$id.img';
+          await File(p.join(store.coversDir.path, coverName))
+              .writeAsBytes(tags.pictures.first.bytes);
+        }
+      } catch (_) {
+        // No readable tags: the media database entry is enough to play it.
+      }
+
+      await store.add(Track(
+        id: id,
+        title: song.title.isEmpty ? p.basenameWithoutExtension(song.path) : song.title,
+        artist: song.artist,
+        album: song.album,
+        durationMs: song.durationMs,
+        fileName: p.basename(song.path),
+        externalPath: song.path,
+        coverName: coverName,
+        addedAt: DateTime.now(),
+      ));
+      added++;
+    }
+
+    onProgress?.call(songs.length, songs.length);
     return added;
   }
 

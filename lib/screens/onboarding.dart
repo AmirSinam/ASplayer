@@ -5,6 +5,7 @@ import '../app_state.dart';
 import '../data/library_store.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/import_device_button.dart';
 
 class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({super.key});
@@ -101,14 +102,15 @@ class OnboardingScreen extends StatelessWidget {
                     style: TextStyle(fontSize: 13.5, height: 1.8, color: colors.secondaryText),
                   ),
                   const SizedBox(height: 22),
+                  const ImportDeviceButton(),
+                  const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
-                    child: FilledButton(
+                    child: TextButton(
                       onPressed: app.finishOnboarding,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: accent,
-                        foregroundColor: onAccent,
-                        padding: const EdgeInsets.symmetric(vertical: 17),
+                      style: TextButton.styleFrom(
+                        foregroundColor: colors.primaryText,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
                         shape: const StadiumBorder(),
                       ),
                       child: Text(

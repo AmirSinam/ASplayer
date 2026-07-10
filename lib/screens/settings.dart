@@ -6,6 +6,7 @@ import '../app_state.dart';
 import '../data/library_store.dart';
 import '../l10n.dart';
 import '../theme.dart';
+import '../widgets/import_device_button.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -72,6 +73,20 @@ class SettingsScreen extends StatelessWidget {
                   return _row(s.storageUsed, '$mb MB', colors);
                 },
               ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          _Card(
+            children: [
+              _title(s.importFromPhone, colors),
+              const SizedBox(height: 8),
+              Text(
+                s.importFromPhoneBody,
+                style: TextStyle(fontSize: 13, height: 1.8, color: colors.secondaryText),
+              ),
+              const SizedBox(height: 14),
+              const ImportDeviceButton(filled: false),
             ],
           ),
           const SizedBox(height: 14),

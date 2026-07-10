@@ -8,6 +8,7 @@ import '../app_state.dart';
 import '../data/library_store.dart';
 import '../models.dart';
 import '../theme.dart';
+import 'import_device_button.dart';
 
 class Artwork extends StatelessWidget {
   const Artwork({super.key, required this.track, this.radius = R.row, this.size});
@@ -380,9 +381,14 @@ class EmptyLibrary extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          FilledButton(
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: const ImportDeviceButton(),
+          ),
+          const SizedBox(height: 6),
+          TextButton(
             onPressed: onImport,
-            style: FilledButton.styleFrom(backgroundColor: accent, foregroundColor: onAccent),
+            style: TextButton.styleFrom(foregroundColor: colors.secondaryText),
             child: Text(s.importFromFiles),
           ),
         ],

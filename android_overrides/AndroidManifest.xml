@@ -8,6 +8,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Reading the songs already on the phone. The old permission is only
+         requested on Android 12 and below, where the audio one does not exist. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
     <application
         android:label="ASplayer"
         android:name="${applicationName}"
