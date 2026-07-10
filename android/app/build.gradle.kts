@@ -16,8 +16,10 @@ val keyProperties = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 
+// GitHub Actions hands an unset secret through as an empty string, not as null,
+// so blanks have to be folded into null before anything touches the filesystem.
 fun signingValue(propertyKey: String, envKey: String): String? =
-    keyProperties.getProperty(propertyKey) ?: System.getenv(envKey)
+    (keyProperties.getProperty(propertyKey) ?: System.getenv(envKey))?.takeIf { it.isNotBlank() }
 
 val storeFilePath = signingValue("storeFile", "ANDROID_KEYSTORE_PATH")
 val hasReleaseKey = storeFilePath != null && file(storeFilePath).exists()
