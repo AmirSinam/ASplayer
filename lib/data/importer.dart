@@ -14,7 +14,7 @@ class Importer {
 
   /// Opens the system picker. Returns how many files were added.
   Future<int> pickAndImport() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.audio,
       allowMultiple: true,
     );
