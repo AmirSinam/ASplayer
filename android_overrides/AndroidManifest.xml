@@ -79,6 +79,21 @@
             </intent-filter>
         </receiver>
 
+        <!-- Home-screen now-playing widget -->
+        <receiver
+            android:name=".NowPlayingWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="ir.aspoormehr.asplayer.WIDGET_PLAY_PAUSE" />
+                <action android:name="ir.aspoormehr.asplayer.WIDGET_NEXT" />
+                <action android:name="ir.aspoormehr.asplayer.WIDGET_PREV" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/now_playing_widget_info" />
+        </receiver>
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

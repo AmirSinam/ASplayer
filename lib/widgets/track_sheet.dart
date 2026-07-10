@@ -147,6 +147,63 @@ Future<void> showAddToPlaylist(BuildContext context, Track track) {
   );
 }
 
+/// Adds many tracks to a playlist at once — used by multi-select and by the
+/// per-album/artist action sheet.
+Future<void> showAddTracksToPlaylist(BuildContext context, List<Track> tracks) {
+  final app = context.read<AppState>();
+  final store = context.read<LibraryStore>();
+  final s = app.s;
+  final colors = AppColors.of(context);
+
+  Future<void> addAll(Playlist playlist) async {
+    for (final track in tracks) {
+      await store.addToPlaylist(playlist, track);
+    }
+  }
+
+  return showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: colors.background,
+    showDragHandle: true,
+    builder: (sheetContext) => AnimatedBuilder(
+      animation: store,
+      builder: (context, _) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.add, color: accent),
+              title: Text(s.newPlaylist, style: const TextStyle(color: accent, fontSize: 15)),
+              onTap: () async {
+                Navigator.pop(sheetContext);
+                final name = await promptForName(context, s);
+                if (name != null && name.isNotEmpty) {
+                  await store.createPlaylist(name);
+                  final created = store.playlists.firstWhere((p) => p.name == name);
+                  await addAll(created);
+                }
+              },
+            ),
+            ...store.playlists.map((playlist) => ListTile(
+                  leading: const Icon(Icons.queue_music, color: accent),
+                  title: Text(playlist.name, style: TextStyle(color: colors.primaryText)),
+                  subtitle: Text(
+                    s.songsCount(playlist.trackIds.length),
+                    style: TextStyle(color: colors.secondaryText, fontSize: 12),
+                  ),
+                  onTap: () async {
+                    await addAll(playlist);
+                    if (sheetContext.mounted) Navigator.pop(sheetContext);
+                  },
+                )),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 Future<String?> promptForName(BuildContext context, Strings s) {
   final controller = TextEditingController();
   return showDialog<String>(

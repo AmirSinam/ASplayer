@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../data/library_store.dart';
+import '../data/widget_bridge.dart';
 import '../models.dart';
 
 /// Owns playback and the queue. The audio_service handler below is a thin shell
@@ -254,6 +255,15 @@ class PlayerController extends ChangeNotifier {
     if (handler == null || track == null) return;
 
     final cover = store.coverPathOf(track);
+
+    // Keep the home-screen widget in step with the notification.
+    WidgetBridge.update(
+      title: track.title,
+      artist: track.artist,
+      coverPath: cover,
+      playing: playing,
+    );
+
     handler.mediaItem.add(MediaItem(
       id: track.id,
       title: track.title,

@@ -5,6 +5,7 @@ import '../app_state.dart';
 import '../audio/player_controller.dart';
 import '../data/importer.dart';
 import '../data/library_store.dart';
+import '../l10n.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -40,11 +41,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             children: [
               Text(
                 s.library,
-                style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w800,
-                  color: colors.primaryText,
-                ),
+                style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: colors.primaryText),
               ),
               const Spacer(),
               if (_section == LibrarySection.songs && tracks.isNotEmpty)
@@ -102,10 +99,29 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 }
 
-class _Songs extends StatelessWidget {
+// MARK: - Songs with multi-select
+
+class _Songs extends StatefulWidget {
   const _Songs({required this.tracks});
 
   final List<Track> tracks;
+
+  @override
+  State<_Songs> createState() => _SongsState();
+}
+
+class _SongsState extends State<_Songs> {
+  final Set<String> _selected = {};
+  bool get _selecting => _selected.isNotEmpty;
+
+  void _toggle(Track track) {
+    setState(() {
+      if (!_selected.remove(track.id)) _selected.add(track.id);
+    });
+  }
+
+  List<Track> get _selectedTracks =>
+      widget.tracks.where((t) => _selected.contains(t.id)).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -117,50 +133,189 @@ class _Songs extends StatelessWidget {
 
     return Column(
       children: [
-        GestureDetector(
-          onTap: () => tracks.isEmpty ? null : player.play(tracks.first, tracks),
-          child: Glass(
-            radius: 18,
-            elevated: false,
-            padding: const EdgeInsets.all(15),
-            child: Row(
-              children: [
-                const Icon(Icons.play_arrow, size: 20, color: accent),
-                const SizedBox(width: 8),
-                Text(
-                  s.playAll,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: colors.primaryText,
+        if (_selecting)
+          _SelectionBar(
+            count: _selected.length,
+            allSelected: _selected.length == widget.tracks.length,
+            onSelectAll: () => setState(() {
+              if (_selected.length == widget.tracks.length) {
+                _selected.clear();
+              } else {
+                _selected
+                  ..clear()
+                  ..addAll(widget.tracks.map((t) => t.id));
+              }
+            }),
+            onQueue: () {
+              for (final t in _selectedTracks) {
+                player.addToQueue(t);
+              }
+              setState(_selected.clear);
+            },
+            onPlaylist: () async {
+              await showAddTracksToPlaylist(context, _selectedTracks);
+              if (mounted) setState(_selected.clear);
+            },
+            onDelete: () => _confirmDelete(context, store, s),
+            onClose: () => setState(_selected.clear),
+          )
+        else
+          GestureDetector(
+            onTap: () => widget.tracks.isEmpty ? null : player.play(widget.tracks.first, widget.tracks),
+            child: Glass(
+              radius: 18,
+              elevated: false,
+              padding: const EdgeInsets.all(15),
+              child: Row(
+                children: [
+                  const Icon(Icons.play_arrow, size: 20, color: accent),
+                  const SizedBox(width: 8),
+                  Text(
+                    s.playAll,
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: colors.primaryText),
                   ),
-                ),
-                const Spacer(),
-                Text(
-                  s.songsCount(tracks.length),
-                  style: TextStyle(fontSize: 12.5, color: colors.secondaryText),
-                ),
-              ],
+                  const Spacer(),
+                  Text(
+                    s.songsCount(widget.tracks.length),
+                    style: TextStyle(fontSize: 12.5, color: colors.secondaryText),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
         const SizedBox(height: 10),
-        ...tracks.map(
-          (track) => GestureDetector(
+        ...widget.tracks.map((track) {
+          final selected = _selected.contains(track.id);
+          return GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => player.play(track, tracks),
-            onLongPress: () => showTrackSheet(context, track),
-            child: TrackRow(
+            // Long-press starts (or extends) a selection; tap plays, or toggles
+            // once selecting.
+            onTap: () => _selecting ? _toggle(track) : player.play(track, widget.tracks),
+            onLongPress: () => _toggle(track),
+            child: _SelectableRow(
               track: track,
+              selecting: _selecting,
+              selected: selected,
               isCurrent: player.current?.id == track.id,
               onFavorite: () => store.toggleFavorite(track),
             ),
-          ),
-        ),
+          );
+        }),
       ],
     );
   }
+
+  Future<void> _confirmDelete(BuildContext context, LibraryStore store, Strings s) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(s.delete),
+        content: Text(s.deleteQuestion),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: Text(s.cancel)),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(s.delete, style: const TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await store.deleteMany(_selectedTracks);
+    if (mounted) setState(_selected.clear);
+  }
 }
+
+class _SelectionBar extends StatelessWidget {
+  const _SelectionBar({
+    required this.count,
+    required this.allSelected,
+    required this.onSelectAll,
+    required this.onQueue,
+    required this.onPlaylist,
+    required this.onDelete,
+    required this.onClose,
+  });
+
+  final int count;
+  final bool allSelected;
+  final VoidCallback onSelectAll, onQueue, onPlaylist, onDelete, onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final s = context.watch<AppState>().s;
+
+    return Glass(
+      radius: 18,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: onClose,
+            icon: Icon(Icons.close, color: colors.primaryText),
+            tooltip: s.close,
+          ),
+          Text(
+            s.nSelected(count),
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: colors.primaryText),
+          ),
+          const Spacer(),
+          IconButton(onPressed: onSelectAll, tooltip: s.selectAll,
+              icon: Icon(allSelected ? Icons.deselect : Icons.select_all, color: colors.primaryText)),
+          IconButton(onPressed: onQueue, tooltip: s.addToQueue,
+              icon: Icon(Icons.queue_music, color: colors.primaryText)),
+          IconButton(onPressed: onPlaylist, tooltip: s.addToPlaylist,
+              icon: Icon(Icons.playlist_add, color: colors.primaryText)),
+          IconButton(onPressed: onDelete, tooltip: s.delete,
+              icon: const Icon(Icons.delete_outline, color: Colors.redAccent)),
+        ],
+      ),
+    );
+  }
+}
+
+class _SelectableRow extends StatelessWidget {
+  const _SelectableRow({
+    required this.track,
+    required this.selecting,
+    required this.selected,
+    required this.isCurrent,
+    required this.onFavorite,
+  });
+
+  final Track track;
+  final bool selecting, selected, isCurrent;
+  final VoidCallback onFavorite;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!selecting) {
+      return TrackRow(track: track, isCurrent: isCurrent, onFavorite: onFavorite);
+    }
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      decoration: BoxDecoration(
+        color: selected ? accent.withValues(alpha: 0.14) : Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Row(
+        children: [
+          Icon(
+            selected ? Icons.check_circle : Icons.circle_outlined,
+            color: selected ? accent : AppColors.of(context).secondaryText,
+          ),
+          const SizedBox(width: 4),
+          Expanded(child: TrackRow(track: track, isCurrent: isCurrent)),
+        ],
+      ),
+    );
+  }
+}
+
+// MARK: - Browse by artist / album
 
 class _Browse extends StatelessWidget {
   const _Browse({required this.tracks, required this.byArtist});
@@ -174,8 +329,13 @@ class _Browse extends StatelessWidget {
 
     final groups = <String, List<Track>>{};
     for (final track in tracks) {
-      final key = byArtist ? track.artistName(s) : track.albumName(s);
-      groups.putIfAbsent(key, () => []).add(track);
+      // One song credited to several artists shows up under each of them.
+      final keys = byArtist
+          ? (track.artist.isEmpty ? [s.unknownArtist] : splitArtists(track.artist))
+          : [track.albumName(s)];
+      for (final key in keys) {
+        groups.putIfAbsent(key, () => []).add(track);
+      }
     }
     final names = groups.keys.toList()..sort();
 
@@ -190,10 +350,85 @@ class _Browse extends StatelessWidget {
             context,
             MaterialPageRoute(builder: (_) => _GroupDetail(title: name, tracks: items)),
           ),
+          onLongPress: () => _showGroupActions(context, name, items),
         );
       }).toList(),
     );
   }
+}
+
+/// The per-album / per-artist action sheet: select a group and act on all of it.
+void _showGroupActions(BuildContext context, String title, List<Track> tracks) {
+  final s = context.read<AppState>().s;
+  final store = context.read<LibraryStore>();
+  final player = context.read<PlayerController>();
+  final colors = AppColors.of(context);
+
+  showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: colors.background,
+    showDragHandle: true,
+    builder: (sheetContext) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold, color: colors.primaryText),
+                  ),
+                ),
+                Text(s.songsCount(tracks.length),
+                    style: TextStyle(color: colors.secondaryText, fontSize: 12.5)),
+              ],
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.play_arrow, color: accent),
+            title: Text(s.playAll),
+            onTap: () {
+              Navigator.pop(sheetContext);
+              if (tracks.isNotEmpty) player.play(tracks.first, tracks);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.queue_music, color: accent),
+            title: Text(s.addToQueue),
+            onTap: () {
+              Navigator.pop(sheetContext);
+              for (final t in tracks) {
+                player.addToQueue(t);
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.playlist_add, color: accent),
+            title: Text(s.addToPlaylist),
+            onTap: () {
+              Navigator.pop(sheetContext);
+              showAddTracksToPlaylist(context, tracks);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+            title: Text(s.deleteFromLibrary, style: const TextStyle(color: Colors.redAccent)),
+            onTap: () async {
+              Navigator.pop(sheetContext);
+              await store.deleteMany(tracks);
+            },
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    ),
+  );
 }
 
 class _GroupRow extends StatelessWidget {
@@ -202,12 +437,14 @@ class _GroupRow extends StatelessWidget {
     required this.subtitle,
     required this.cover,
     required this.onTap,
+    this.onLongPress,
   });
 
   final String title;
   final String subtitle;
   final Track? cover;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -216,6 +453,7 @@ class _GroupRow extends StatelessWidget {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(
@@ -231,10 +469,7 @@ class _GroupRow extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.bold,
-                      color: colors.primaryText,
-                    ),
+                        fontSize: 15.5, fontWeight: FontWeight.bold, color: colors.primaryText),
                   ),
                   const SizedBox(height: 3),
                   Text(subtitle, style: TextStyle(fontSize: 12.5, color: colors.secondaryText)),
@@ -282,6 +517,8 @@ class _GroupDetail extends StatelessWidget {
   }
 }
 
+// MARK: - Playlists
+
 class _Playlists extends StatelessWidget {
   const _Playlists();
 
@@ -311,11 +548,7 @@ class _Playlists extends StatelessWidget {
                 const SizedBox(width: 10),
                 Text(
                   s.newPlaylist,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: accent,
-                  ),
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: accent),
                 ),
               ],
             ),
@@ -331,16 +564,14 @@ class _Playlists extends StatelessWidget {
           ...store.playlists.map((playlist) {
             final tracks = store.byIds(playlist.trackIds);
             final minutes = tracks.fold<int>(0, (sum, t) => sum + t.durationMs) ~/ 60000;
-            return GestureDetector(
+            return _GroupRow(
+              title: playlist.name,
+              subtitle: '${s.songsCount(tracks.length)} · ${s.totalDuration(minutes)}',
+              cover: tracks.isEmpty ? null : tracks.first,
               onLongPress: () => store.deletePlaylist(playlist),
-              child: _GroupRow(
-                title: playlist.name,
-                subtitle: '${s.songsCount(tracks.length)} · ${s.totalDuration(minutes)}',
-                cover: tracks.isEmpty ? null : tracks.first,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => _PlaylistDetail(playlist: playlist)),
-                ),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => _PlaylistDetail(playlist: playlist)),
               ),
             );
           }),

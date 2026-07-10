@@ -87,6 +87,12 @@ class Strings {
     required this.appearanceSystem,
     required this.appearanceLight,
     required this.appearanceDark,
+    required this.selectAll,
+    required this.deselectAll,
+    required this.nSelected,
+    required this.delete,
+    required this.deleteQuestion,
+    required this.groupActions,
     required this.importFromPhone,
     required this.importFromPhoneBody,
     required this.scanningPhone,
@@ -124,6 +130,8 @@ class Strings {
   final String settings, trackCount, storageUsed;
   final String howToAdd, howToAddBody, backgroundPlay, backgroundPlayBody;
   final String language, appearance, appearanceSystem, appearanceLight, appearanceDark;
+  final String selectAll, deselectAll, delete, deleteQuestion, groupActions;
+  final String Function(int) nSelected;
   final String importFromPhone, importFromPhoneBody, scanningPhone;
   final String noSongsOnPhone, permissionNeeded, importing;
   final String Function(int) imported;
@@ -207,6 +215,12 @@ class Strings {
     appearanceSystem: 'System',
     appearanceLight: 'Light',
     appearanceDark: 'Dark',
+    selectAll: 'Select all',
+    deselectAll: 'Deselect all',
+    nSelected: _enSelected,
+    delete: 'Delete',
+    deleteQuestion: 'Delete the selected songs from your library?',
+    groupActions: 'Actions',
     importFromPhone: 'Import songs from this phone',
     importFromPhoneBody:
         'Adds every song already on your phone. Files are not copied — they stay where they are, and removing a song here never deletes it.',
@@ -300,6 +314,12 @@ class Strings {
     appearanceSystem: 'سیستم',
     appearanceLight: 'روشن',
     appearanceDark: 'تیره',
+    selectAll: 'انتخاب همه',
+    deselectAll: 'برداشتن انتخاب',
+    nSelected: _faSelected,
+    delete: 'حذف',
+    deleteQuestion: 'آهنگ‌های انتخاب‌شده از کتابخانه حذف شوند؟',
+    groupActions: 'کارها',
     importFromPhone: 'وارد کردن آهنگ‌های گوشی',
     importFromPhoneBody:
         'همه‌ی آهنگ‌هایی که روی گوشی داری اضافه می‌شوند. فایل‌ها کپی نمی‌شوند — سر جایشان می‌مانند، و حذف آهنگ از اینجا هرگز فایل اصلی را پاک نمی‌کند.',
@@ -323,6 +343,7 @@ class Strings {
   );
 }
 
+String _enSelected(int n) => '$n selected';
 String _enImported(int n) => '$n songs added';
 String _enSongs(int n) => '$n songs';
 String _enSongsInLibrary(int n) => '$n songs in your library';
@@ -330,6 +351,7 @@ String _enMinutes(int n) => '$n minutes';
 String _enSleepsIn(String t) => 'Stops in $t';
 String _enTotal(int m) => m < 60 ? '$m min' : '${m ~/ 60} h ${m % 60} min';
 
+String _faSelected(int n) => '$n انتخاب شد';
 String _faImported(int n) => '$n آهنگ اضافه شد';
 String _faSongs(int n) => '$n آهنگ';
 String _faSongsInLibrary(int n) => '$n آهنگ در کتابخانه‌ات';

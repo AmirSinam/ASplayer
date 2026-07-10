@@ -21,6 +21,16 @@ class MainActivity : AudioServiceActivity() {
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .setMethodCallHandler { call, result -> handle(call, result) }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, WIDGET_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                if (call.method == "refresh") {
+                    NowPlayingWidget.refresh(applicationContext)
+                    result.success(null)
+                } else {
+                    result.notImplemented()
+                }
+            }
     }
 
     private fun handle(call: MethodCall, result: MethodChannel.Result) {
@@ -135,6 +145,7 @@ class MainActivity : AudioServiceActivity() {
 
     private companion object {
         const val CHANNEL = "ir.aspoormehr.asplayer/device_music"
+        const val WIDGET_CHANNEL = "ir.aspoormehr.asplayer/widget"
         const val PERMISSION_REQUEST = 4321
     }
 }

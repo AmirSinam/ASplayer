@@ -1,5 +1,27 @@
 import 'l10n.dart';
 
+/// Splits a combined artist tag into the people in it. Handles the common
+/// joiners — "feat", "ft", "&", "x", "×", and commas — so "Yas & Sohrab" or
+/// "A x B" each become two artists. Word-boundary "x" avoids cutting names
+/// like "Max". Slashes are left alone on purpose (AC/DC, R/B).
+final _artistSplit = RegExp(
+  r'\s*(?:feat\.?|ft\.?|featuring|&|،|,|\bx\b|×)\s*',
+  caseSensitive: false,
+);
+
+List<String> splitArtists(String raw) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) return const [];
+  final seen = <String>{};
+  final parts = <String>[];
+  for (final piece in trimmed.split(_artistSplit)) {
+    final name = piece.trim();
+    if (name.isEmpty) continue;
+    if (seen.add(name.toLowerCase())) parts.add(name);
+  }
+  return parts.isEmpty ? [trimmed] : parts;
+}
+
 class Track {
   Track({
     required this.id,

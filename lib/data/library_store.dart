@@ -63,9 +63,22 @@ class LibraryStore extends ChangeNotifier {
     await save();
   }
 
+  /// Bulk version of [delete]. Saves once at the end rather than per track.
+  Future<void> deleteMany(Iterable<Track> tracks) async {
+    for (final track in tracks) {
+      await _erase(track);
+    }
+    await save();
+  }
+
   /// Removes the track from the library. A linked file belongs to the user and
   /// is left exactly where it is — only copies we made are deleted.
   Future<void> delete(Track track) async {
+    await _erase(track);
+    await save();
+  }
+
+  Future<void> _erase(Track track) async {
     if (!track.isLinked) {
       final file = File(filePathOf(track));
       if (await file.exists()) await file.delete();
@@ -81,7 +94,6 @@ class LibraryStore extends ChangeNotifier {
     for (final playlist in _playlists) {
       playlist.trackIds.remove(track.id);
     }
-    await save();
   }
 
   Future<void> toggleFavorite(Track track) async {
