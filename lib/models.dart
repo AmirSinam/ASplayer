@@ -36,7 +36,9 @@ class Track {
     this.lastPlayedAt,
     this.playCount = 0,
     this.favorite = false,
-  });
+    this.lyrics = '',
+    List<int>? bookmarksMs,
+  }) : bookmarksMs = bookmarksMs ?? [];
 
   final String id;
   String title;
@@ -63,7 +65,16 @@ class Track {
   int playCount;
   bool favorite;
 
+  /// Raw lyrics — either LRC (timestamped, synced) or plain text.
+  String lyrics;
+
+  /// Saved moments in the song, in milliseconds, so the user can jump straight
+  /// to a favourite part later. Kept sorted.
+  final List<int> bookmarksMs;
+
   Duration get duration => Duration(milliseconds: durationMs);
+
+  bool get hasLyrics => lyrics.trim().isNotEmpty;
 
   bool get isLinked => externalPath != null;
 
@@ -83,6 +94,8 @@ class Track {
         'lastPlayedAt': lastPlayedAt?.toIso8601String(),
         'playCount': playCount,
         'favorite': favorite,
+        'lyrics': lyrics,
+        'bookmarksMs': bookmarksMs,
       };
 
   factory Track.fromJson(Map<String, dynamic> json) => Track(
@@ -100,6 +113,8 @@ class Track {
             : DateTime.parse(json['lastPlayedAt'] as String),
         playCount: json['playCount'] as int? ?? 0,
         favorite: json['favorite'] as bool? ?? false,
+        lyrics: json['lyrics'] as String? ?? '',
+        bookmarksMs: (json['bookmarksMs'] as List?)?.cast<int>() ?? [],
       );
 }
 

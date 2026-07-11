@@ -107,6 +107,50 @@ class LibraryStore extends ChangeNotifier {
     await save();
   }
 
+  /// Edits the library entry — this never rewrites the audio file's own tags,
+  /// so it is always safe and reversible.
+  Future<void> editTrack(
+    Track track, {
+    String? title,
+    String? artist,
+    String? album,
+    String? lyrics,
+  }) async {
+    if (title != null) track.title = title;
+    if (artist != null) track.artist = artist;
+    if (album != null) track.album = album;
+    if (lyrics != null) track.lyrics = lyrics;
+    await save();
+  }
+
+  /// Replaces the cover with picked image bytes. A unique name each time keeps
+  /// Flutter's image cache from serving the old picture.
+  Future<void> setCover(Track track, List<int> bytes) async {
+    final old = track.coverName;
+    final name = '${track.id}_${DateTime.now().millisecondsSinceEpoch}.img';
+    await File(p.join(coversDir.path, name)).writeAsBytes(bytes);
+    track.coverName = name;
+    // Drop the previous cover file if it was one we own for this track.
+    if (old != null && old.startsWith(track.id)) {
+      final oldFile = File(p.join(coversDir.path, old));
+      if (await oldFile.exists()) await oldFile.delete();
+    }
+    await save();
+  }
+
+  Future<void> addBookmark(Track track, int ms) async {
+    if (track.bookmarksMs.contains(ms)) return;
+    track.bookmarksMs
+      ..add(ms)
+      ..sort();
+    await save();
+  }
+
+  Future<void> removeBookmark(Track track, int ms) async {
+    track.bookmarksMs.remove(ms);
+    await save();
+  }
+
   Future<void> createPlaylist(String name, {Track? withTrack}) async {
     _playlists.insert(
       0,

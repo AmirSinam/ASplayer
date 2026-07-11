@@ -7,11 +7,14 @@ import '../app_state.dart';
 import '../audio/player_controller.dart';
 import '../data/library_store.dart';
 import '../l10n.dart';
+import '../lyrics.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/track_sheet.dart';
 import '../widgets/waveform_bar.dart';
+import 'edit_track.dart';
+import 'lyrics_screen.dart';
 import 'queue.dart';
 
 class PlayerScreen extends StatefulWidget {
@@ -74,6 +77,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                   Expanded(child: _artwork(track, player)),
                   if (player.sleepRemaining != null) _sleepBadge(s, player),
                   const SizedBox(height: 6),
+                  _currentLine(player, track),
                   _titleRow(track, s, colors, store),
                   const SizedBox(height: 14),
                   _seek(player, s, colors, track),
@@ -115,6 +119,14 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
           icon: Icon(Icons.more_horiz, color: colors.primaryText),
           onSelected: (value) async {
             switch (value) {
+              case 'lyrics':
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => LyricsScreen(track: track)));
+              case 'moments':
+                _showMoments(context, player, track, s);
+              case 'edit':
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => EditTrackScreen(track: track)));
               case 'queue':
                 Navigator.push(
                   context,
@@ -129,6 +141,10 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
             }
           },
           itemBuilder: (context) => [
+            PopupMenuItem(value: 'lyrics', child: Text(s.lyrics)),
+            PopupMenuItem(value: 'moments', child: Text(s.moments)),
+            PopupMenuItem(value: 'edit', child: Text(s.editSong)),
+            const PopupMenuDivider(),
             PopupMenuItem(value: 'queue', child: Text(s.queue)),
             PopupMenuItem(value: 'playlist', child: Text(s.addToPlaylist)),
             PopupMenuItem(value: 'sleep', child: Text(s.sleepTimer)),
@@ -300,6 +316,97 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
         ),
         _HeartButton(track: track, store: store),
       ],
+    );
+  }
+
+  // MARK: - Current lyric line (under the cover)
+
+  Widget _currentLine(PlayerController player, Track track) {
+    if (!track.hasLyrics) return const SizedBox.shrink();
+    final lyrics = Lyrics.parse(track.lyrics);
+    if (!lyrics.synced) return const SizedBox.shrink();
+
+    return StreamBuilder<Duration>(
+      stream: player.positionStream,
+      builder: (context, snapshot) {
+        final i = lyrics.activeIndex(snapshot.data ?? Duration.zero);
+        final text = i >= 0 ? lyrics.lines[i].text : '';
+        return GestureDetector(
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => LyricsScreen(track: track)),
+          ),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: Text(
+              text,
+              key: ValueKey(text),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: accent,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // MARK: - Moments (bookmarks)
+
+  void _showMoments(BuildContext context, PlayerController player, Track track, Strings s) {
+    final store = context.read<LibraryStore>();
+    final colors = AppColors.of(context);
+
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: colors.background,
+      showDragHandle: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheet) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.add_circle, color: accent),
+                title: Text(s.saveMoment),
+                onTap: () async {
+                  await store.addBookmark(track, player.position.inMilliseconds);
+                  setSheet(() {});
+                },
+              ),
+              const Divider(height: 1),
+              if (track.bookmarksMs.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(s.noMoments, style: TextStyle(color: colors.secondaryText)),
+                )
+              else
+                ...track.bookmarksMs.map((ms) => ListTile(
+                      leading: const Icon(Icons.bookmark, color: accent),
+                      title: Text(formatDuration(Duration(milliseconds: ms)),
+                          style: TextStyle(color: colors.primaryText)),
+                      trailing: IconButton(
+                        icon: Icon(Icons.close, size: 18, color: colors.secondaryText),
+                        onPressed: () async {
+                          await store.removeBookmark(track, ms);
+                          setSheet(() {});
+                        },
+                      ),
+                      onTap: () {
+                        player.seek(Duration(milliseconds: ms));
+                        Navigator.pop(sheetContext);
+                      },
+                    )),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

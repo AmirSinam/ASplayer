@@ -6,6 +6,8 @@ import '../audio/player_controller.dart';
 import '../data/library_store.dart';
 import '../l10n.dart';
 import '../models.dart';
+import '../screens/edit_track.dart';
+import '../screens/lyrics_screen.dart';
 import '../theme.dart';
 import 'common.dart';
 
@@ -67,6 +69,14 @@ Future<void> showTrackSheet(
             item(Icons.playlist_play, s.playNext, () => player.playNext(track)),
             item(Icons.queue_music, s.addToQueue, () => player.addToQueue(track)),
             item(Icons.playlist_add, s.addToPlaylist, () => showAddToPlaylist(context, track)),
+            item(Icons.edit_outlined, s.editSong, () {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => EditTrackScreen(track: track)));
+            }),
+            item(Icons.lyrics_outlined, s.lyrics, () {
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => LyricsScreen(track: track)));
+            }),
             item(
               track.favorite ? Icons.favorite : Icons.favorite_border,
               track.favorite ? s.unmarkFavorite : s.markFavorite,

@@ -59,6 +59,7 @@ class PlayerController extends ChangeNotifier {
   Duration? get sleepRemaining => _sleepRemaining;
 
   Stream<Duration> get positionStream => _player.positionStream;
+  Duration get position => _player.position;
   Duration get duration => _player.duration ?? _current?.duration ?? Duration.zero;
 
   /// Derived rather than stored, so queue edits can never desync it.

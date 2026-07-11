@@ -111,6 +111,7 @@ class Importer {
     String title = p.basenameWithoutExtension(fallback);
     String artist = '';
     String album = '';
+    String lyrics = '';
     int durationMs = 0;
     String? coverName;
 
@@ -122,6 +123,7 @@ class Importer {
 
       artist = tags.artist?.trim() ?? '';
       album = tags.album?.trim() ?? '';
+      lyrics = tags.lyrics?.trim() ?? '';
       durationMs = tags.duration?.inMilliseconds ?? 0;
 
       if (tags.pictures.isNotEmpty) {
@@ -141,6 +143,7 @@ class Importer {
       durationMs: durationMs,
       fileName: fileName,
       coverName: coverName,
+      lyrics: lyrics,
       addedAt: DateTime.now(),
     );
   }
