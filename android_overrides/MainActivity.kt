@@ -27,7 +27,7 @@ class MainActivity : AudioServiceActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, WIDGET_CHANNEL)
             .setMethodCallHandler { call, result ->
                 if (call.method == "refresh") {
-                    NowPlayingWidget.refresh(applicationContext)
+                    WidgetShared.refreshAll(applicationContext)
                     result.success(null)
                 } else {
                     result.notImplemented()

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
@@ -27,6 +28,8 @@ class RootScreen extends StatefulWidget {
 
 class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
   StreamSubscription<List<SharedMediaFile>>? _shareSub;
+  final _pager = PageController();
+  DateTime? _lastBack;
 
   @override
   void initState() {
@@ -76,7 +79,36 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _shareSub?.cancel();
+    _pager.dispose();
     super.dispose();
+  }
+
+  void _goToTab(int index) {
+    // Animate the pager; its callback writes app.tab back.
+    _pager.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  /// Back button: step back to Home first, and only leave the app on a second
+  /// press from Home — so a stray back never dumps the user out.
+  Future<void> _handleBack(AppState app) async {
+    if (app.tab != 0) {
+      _goToTab(0);
+      return;
+    }
+    final now = DateTime.now();
+    if (_lastBack != null && now.difference(_lastBack!) < const Duration(seconds: 2)) {
+      await SystemNavigator.pop();
+      return;
+    }
+    _lastBack = now;
+    final s = app.s;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(s.pressBackAgain), duration: const Duration(seconds: 2)),
+    );
   }
 
   @override
@@ -86,42 +118,77 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
 
     final player = context.watch<PlayerController>();
 
-    return Scaffold(
-      extendBody: true,
-      body: Stack(
-        children: [
-          Positioned.fill(child: Backdrop(track: player.current)),
-          IndexedStack(
-            index: app.tab,
-            children: const [
-              HomeScreen(),
-              FavoritesScreen(),
-              LibraryScreen(),
-              SettingsScreen(),
-            ],
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 8,
-            child: SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (player.current != null)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 20),
-                      child: _MiniPlayer(),
-                    ),
-                  const SizedBox(height: 10),
-                  const _FloatingTabBar(),
-                ],
+    // Keep the pager in step when the tab is changed from the bar.
+    if (_pager.hasClients && _pager.page?.round() != app.tab) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_pager.hasClients && _pager.page?.round() != app.tab) _goToTab(app.tab);
+      });
+    }
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleBack(app);
+      },
+      child: Scaffold(
+        extendBody: true,
+        body: Stack(
+          children: [
+            Positioned.fill(child: Backdrop(track: player.current)),
+            // Swipe left/right to move between Home, Favorites, Library, Settings.
+            PageView(
+              controller: _pager,
+              onPageChanged: (index) => app.tab = index,
+              children: const [
+                _KeepAlive(child: HomeScreen()),
+                _KeepAlive(child: FavoritesScreen()),
+                _KeepAlive(child: LibraryScreen()),
+                _KeepAlive(child: SettingsScreen()),
+              ],
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 8,
+              child: SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (player.current != null)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 20),
+                        child: _MiniPlayer(),
+                      ),
+                    const SizedBox(height: 10),
+                    _FloatingTabBar(onTap: _goToTab),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
+  }
+}
+
+/// Keeps a page's state (scroll position, selections) alive while swiping.
+class _KeepAlive extends StatefulWidget {
+  const _KeepAlive({required this.child});
+  final Widget child;
+
+  @override
+  State<_KeepAlive> createState() => _KeepAliveState();
+}
+
+class _KeepAliveState extends State<_KeepAlive> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }
 
@@ -192,7 +259,9 @@ class _MiniPlayer extends StatelessWidget {
 }
 
 class _FloatingTabBar extends StatelessWidget {
-  const _FloatingTabBar();
+  const _FloatingTabBar({required this.onTap});
+
+  final ValueChanged<int> onTap;
 
   static const _icons = [
     Icons.home_rounded,
@@ -214,7 +283,7 @@ class _FloatingTabBar extends StatelessWidget {
         children: List.generate(_icons.length, (index) {
           final selected = app.tab == index;
           return GestureDetector(
-            onTap: () => app.tab = index,
+            onTap: () => onTap(index),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               width: 46,

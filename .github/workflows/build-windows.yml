@@ -26,6 +26,10 @@ jobs:
       - name: حذف تست پیش‌فرض
         run: Remove-Item test/widget_test.dart -ErrorAction SilentlyContinue
 
+      # آیکن اپ ویندوز (روی exe و پنجره و نوار وظیفه)
+      - name: اعمال لوگوی ویندوز
+        run: Copy-Item windows_overrides/app_icon.ico windows/runner/resources/app_icon.ico -Force
+
       - name: گرفتن بسته‌ها
         run: flutter pub get
 

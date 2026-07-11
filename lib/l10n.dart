@@ -87,6 +87,7 @@ class Strings {
     required this.appearanceSystem,
     required this.appearanceLight,
     required this.appearanceDark,
+    required this.pressBackAgain,
     required this.selectAll,
     required this.deselectAll,
     required this.nSelected,
@@ -130,6 +131,7 @@ class Strings {
   final String settings, trackCount, storageUsed;
   final String howToAdd, howToAddBody, backgroundPlay, backgroundPlayBody;
   final String language, appearance, appearanceSystem, appearanceLight, appearanceDark;
+  final String pressBackAgain;
   final String selectAll, deselectAll, delete, deleteQuestion, groupActions;
   final String Function(int) nSelected;
   final String importFromPhone, importFromPhoneBody, scanningPhone;
@@ -215,6 +217,7 @@ class Strings {
     appearanceSystem: 'System',
     appearanceLight: 'Light',
     appearanceDark: 'Dark',
+    pressBackAgain: 'Press back again to exit',
     selectAll: 'Select all',
     deselectAll: 'Deselect all',
     nSelected: _enSelected,
@@ -314,6 +317,7 @@ class Strings {
     appearanceSystem: 'سیستم',
     appearanceLight: 'روشن',
     appearanceDark: 'تیره',
+    pressBackAgain: 'برای خروج دوباره بازگشت را بزن',
     selectAll: 'انتخاب همه',
     deselectAll: 'برداشتن انتخاب',
     nSelected: _faSelected,

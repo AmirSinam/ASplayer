@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -403,6 +404,80 @@ class EmptyLibrary extends StatelessWidget {
             child: Text(s.importFromFiles),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A tiny animated equalizer — a few bars bobbing when a song is playing,
+/// frozen flat when paused. Purely decorative.
+class EqualizerBars extends StatefulWidget {
+  const EqualizerBars({
+    super.key,
+    required this.playing,
+    this.color = accent,
+    this.barCount = 4,
+    this.height = 16,
+  });
+
+  final bool playing;
+  final Color color;
+  final int barCount;
+  final double height;
+
+  @override
+  State<EqualizerBars> createState() => _EqualizerBarsState();
+}
+
+class _EqualizerBarsState extends State<EqualizerBars> with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
+    _sync();
+  }
+
+  @override
+  void didUpdateWidget(EqualizerBars old) {
+    super.didUpdateWidget(old);
+    if (old.playing != widget.playing) _sync();
+  }
+
+  void _sync() => widget.playing ? _c.repeat() : _c.stop();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: widget.height,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (context, _) => Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: List.generate(widget.barCount, (i) {
+            final phase = i / widget.barCount;
+            final t = widget.playing
+                ? (0.35 + 0.65 * (0.5 + 0.5 * sin((_c.value + phase) * 2 * pi)))
+                : 0.35;
+            return Container(
+              width: 3,
+              height: widget.height * t,
+              margin: const EdgeInsets.symmetric(horizontal: 1),
+              decoration: BoxDecoration(
+                color: widget.color,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            );
+          }),
+        ),
       ),
     );
   }

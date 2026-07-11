@@ -99,9 +99,16 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
           icon: Icon(Icons.expand_more, color: colors.primaryText),
         ),
         const Spacer(),
-        Text(
-          s.nowPlaying,
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colors.primaryText),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            EqualizerBars(playing: player.playing, height: 14),
+            const SizedBox(width: 8),
+            Text(
+              s.nowPlaying,
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colors.primaryText),
+            ),
+          ],
         ),
         const Spacer(),
         PopupMenuButton<String>(
@@ -364,15 +371,19 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
           GestureDetector(
             onTap: player.toggle,
             child: Container(
-              width: 66,
-              height: 66,
+              width: 70,
+              height: 70,
               decoration: BoxDecoration(
-                color: accent,
                 shape: BoxShape.circle,
+                gradient: const RadialGradient(
+                  center: Alignment(-0.3, -0.4),
+                  radius: 1.1,
+                  colors: [Color(0xFF3FE0DA), accent],
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: accent.withValues(alpha: 0.45),
-                    blurRadius: 20,
+                    color: accent.withValues(alpha: 0.5),
+                    blurRadius: 24,
                     spreadRadius: -2,
                   ),
                 ],
@@ -380,7 +391,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
               child: Icon(
                 player.playing ? Icons.pause : Icons.play_arrow,
                 color: onAccent,
-                size: 32,
+                size: 34,
               ),
             ),
           ),
