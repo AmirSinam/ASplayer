@@ -34,65 +34,79 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
     return SafeArea(
       bottom: false,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 170),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              Text(
-                s.library,
-                style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: colors.primaryText),
-              ),
-              const Spacer(),
-              if (_section == LibrarySection.songs && tracks.isNotEmpty)
-                PopupMenuButton<SortOption>(
-                  tooltip: s.sortBy,
-                  icon: Icon(Icons.swap_vert, color: colors.primaryText),
-                  onSelected: (value) => setState(() => _sort = value),
-                  itemBuilder: (context) => SortOption.values
-                      .map((o) => PopupMenuItem(value: o, child: Text(o.label(s))))
-                      .toList(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+            child: Row(
+              children: [
+                Text(
+                  s.library,
+                  style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: colors.primaryText),
                 ),
-              GestureDetector(
-                onTap: () => context.read<Importer>().pickAndImport(),
-                child: Container(
-                  width: 42,
-                  height: 42,
-                  decoration: const BoxDecoration(color: accent, shape: BoxShape.circle),
-                  child: const Icon(Icons.add, color: onAccent, size: 21),
+                const Spacer(),
+                if (_section == LibrarySection.songs && tracks.isNotEmpty)
+                  PopupMenuButton<SortOption>(
+                    tooltip: s.sortBy,
+                    icon: Icon(Icons.swap_vert, color: colors.primaryText),
+                    onSelected: (value) => setState(() => _sort = value),
+                    itemBuilder: (context) => SortOption.values
+                        .map((o) => PopupMenuItem(value: o, child: Text(o.label(s))))
+                        .toList(),
+                  ),
+                GestureDetector(
+                  onTap: () => context.read<Importer>().pickAndImport(),
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: const BoxDecoration(color: accent, shape: BoxShape.circle),
+                    child: const Icon(Icons.add, color: onAccent, size: 21),
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          SizedBox(
-            height: 40,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: LibrarySection.values.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 9),
-              itemBuilder: (context, index) {
-                final item = LibrarySection.values[index];
-                return GlassChip(
-                  label: item.title(s),
-                  selected: _section == item,
-                  onTap: () => setState(() => _section = item),
-                );
-              },
+              ],
             ),
           ),
           const SizedBox(height: 16),
 
-          if (tracks.isEmpty)
-            EmptyLibrary(onImport: () => context.read<Importer>().pickAndImport())
-          else
-            switch (_section) {
-              LibrarySection.songs => _Songs(tracks: sorted),
-              LibrarySection.artists => _Browse(tracks: tracks, byArtist: true),
-              LibrarySection.albums => _Browse(tracks: tracks, byArtist: false),
-              LibrarySection.playlists => const _Playlists(),
-            },
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              height: 40,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: LibrarySection.values.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 9),
+                itemBuilder: (context, index) {
+                  final item = LibrarySection.values[index];
+                  return GlassChip(
+                    label: item.title(s),
+                    selected: _section == item,
+                    onTap: () => setState(() => _section = item),
+                  );
+                },
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Each section owns a lazy scroll list, so only the visible rows — and
+          // their covers — are ever built. The header and tabs above stay pinned.
+          Expanded(
+            child: tracks.isEmpty
+                ? ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 170),
+                    children: [
+                      EmptyLibrary(onImport: () => context.read<Importer>().pickAndImport()),
+                    ],
+                  )
+                : switch (_section) {
+                    LibrarySection.songs => _Songs(tracks: sorted),
+                    LibrarySection.artists => _Browse(tracks: tracks, byArtist: true),
+                    LibrarySection.albums => _Browse(tracks: tracks, byArtist: false),
+                    LibrarySection.playlists => const _Playlists(),
+                  },
+          ),
         ],
       ),
     );
@@ -131,77 +145,84 @@ class _SongsState extends State<_Songs> {
     final player = context.watch<PlayerController>();
     final s = app.s;
 
-    return Column(
-      children: [
-        if (_selecting)
-          _SelectionBar(
-            count: _selected.length,
-            allSelected: _selected.length == widget.tracks.length,
-            onSelectAll: () => setState(() {
-              if (_selected.length == widget.tracks.length) {
-                _selected.clear();
-              } else {
-                _selected
-                  ..clear()
-                  ..addAll(widget.tracks.map((t) => t.id));
-              }
-            }),
-            onQueue: () {
-              for (final t in _selectedTracks) {
-                player.addToQueue(t);
-              }
-              setState(_selected.clear);
-            },
-            onPlaylist: () async {
-              await showAddTracksToPlaylist(context, _selectedTracks);
-              if (mounted) setState(_selected.clear);
-            },
-            onDelete: () => _confirmDelete(context, store, s),
-            onClose: () => setState(_selected.clear),
-          )
-        else
-          GestureDetector(
-            onTap: () => widget.tracks.isEmpty ? null : player.play(widget.tracks.first, widget.tracks),
-            child: Glass(
-              radius: 18,
-              elevated: false,
-              padding: const EdgeInsets.all(15),
-              child: Row(
-                children: [
-                  const Icon(Icons.play_arrow, size: 20, color: accent),
-                  const SizedBox(width: 8),
-                  Text(
-                    s.playAll,
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: colors.primaryText),
+    // A lazy list: item 0 is the play-all / selection bar, the rest are rows.
+    // Only on-screen rows are built, so covers decode as the user scrolls.
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 170),
+      itemCount: widget.tracks.length + 1,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          final Widget header = _selecting
+              ? _SelectionBar(
+                  count: _selected.length,
+                  allSelected: _selected.length == widget.tracks.length,
+                  onSelectAll: () => setState(() {
+                    if (_selected.length == widget.tracks.length) {
+                      _selected.clear();
+                    } else {
+                      _selected
+                        ..clear()
+                        ..addAll(widget.tracks.map((t) => t.id));
+                    }
+                  }),
+                  onQueue: () {
+                    for (final t in _selectedTracks) {
+                      player.addToQueue(t);
+                    }
+                    setState(_selected.clear);
+                  },
+                  onPlaylist: () async {
+                    await showAddTracksToPlaylist(context, _selectedTracks);
+                    if (mounted) setState(_selected.clear);
+                  },
+                  onDelete: () => _confirmDelete(context, store, s),
+                  onClose: () => setState(_selected.clear),
+                )
+              : GestureDetector(
+                  onTap: () =>
+                      widget.tracks.isEmpty ? null : player.play(widget.tracks.first, widget.tracks),
+                  child: Glass(
+                    radius: 18,
+                    elevated: false,
+                    padding: const EdgeInsets.all(15),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.play_arrow, size: 20, color: accent),
+                        const SizedBox(width: 8),
+                        Text(
+                          s.playAll,
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.bold, color: colors.primaryText),
+                        ),
+                        const Spacer(),
+                        Text(
+                          s.songsCount(widget.tracks.length),
+                          style: TextStyle(fontSize: 12.5, color: colors.secondaryText),
+                        ),
+                      ],
+                    ),
                   ),
-                  const Spacer(),
-                  Text(
-                    s.songsCount(widget.tracks.length),
-                    style: TextStyle(fontSize: 12.5, color: colors.secondaryText),
-                  ),
-                ],
-              ),
-            ),
+                );
+          return Padding(padding: const EdgeInsets.only(bottom: 10), child: header);
+        }
+
+        final track = widget.tracks[index - 1];
+        final selected = _selected.contains(track.id);
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          // Long-press starts (or extends) a selection; tap plays, or toggles
+          // once selecting.
+          onTap: () => _selecting ? _toggle(track) : player.play(track, widget.tracks),
+          onLongPress: () => _toggle(track),
+          child: _SelectableRow(
+            track: track,
+            selecting: _selecting,
+            selected: selected,
+            isCurrent: player.current?.id == track.id,
+            onFavorite: () => store.toggleFavorite(track),
           ),
-        const SizedBox(height: 10),
-        ...widget.tracks.map((track) {
-          final selected = _selected.contains(track.id);
-          return GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            // Long-press starts (or extends) a selection; tap plays, or toggles
-            // once selecting.
-            onTap: () => _selecting ? _toggle(track) : player.play(track, widget.tracks),
-            onLongPress: () => _toggle(track),
-            child: _SelectableRow(
-              track: track,
-              selecting: _selecting,
-              selected: selected,
-              isCurrent: player.current?.id == track.id,
-              onFavorite: () => store.toggleFavorite(track),
-            ),
-          );
-        }),
-      ],
+        );
+      },
     );
   }
 
@@ -339,8 +360,11 @@ class _Browse extends StatelessWidget {
     }
     final names = groups.keys.toList()..sort();
 
-    return Column(
-      children: names.map((name) {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 170),
+      itemCount: names.length,
+      itemBuilder: (context, i) {
+        final name = names[i];
         final items = groups[name]!;
         return _GroupRow(
           title: name,
@@ -352,7 +376,7 @@ class _Browse extends StatelessWidget {
           ),
           onLongPress: () => _showGroupActions(context, name, items),
         );
-      }).toList(),
+      },
     );
   }
 }
@@ -504,16 +528,18 @@ class GroupDetail extends StatelessWidget {
         backgroundColor: Colors.transparent,
         foregroundColor: colors.primaryText,
       ),
-      body: ListView(
+      body: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 170),
-        children: tracks
-            .map((track) => GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => player.play(track, tracks),
-                  onLongPress: () => showTrackSheet(context, track),
-                  child: TrackRow(track: track, isCurrent: player.current?.id == track.id),
-                ))
-            .toList(),
+        itemCount: tracks.length,
+        itemBuilder: (context, i) {
+          final track = tracks[i];
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => player.play(track, tracks),
+            onLongPress: () => showTrackSheet(context, track),
+            child: TrackRow(track: track, isCurrent: player.current?.id == track.id),
+          );
+        },
       ),
     );
   }
@@ -531,7 +557,8 @@ class _Playlists extends StatelessWidget {
     final store = context.watch<LibraryStore>();
     final s = app.s;
 
-    return Column(
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 170),
       children: [
         GestureDetector(
           onTap: () async {
