@@ -339,6 +339,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "2.2.0"
+  palette_generator:
+    dependency: "direct main"
+    description:
+      name: palette_generator
+      sha256: "4420f7ccc3f0a4a906144e73f8b6267cd940b64f57a7262e95cb8cec3a8ae0ed"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "0.3.3+7"
   path:
     dependency: "direct main"
     description:
@@ -459,6 +467,22 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "0.28.0"
+  share_plus:
+    dependency: "direct main"
+    description:
+      name: share_plus
+      sha256: fce43200aa03ea87b91ce4c3ac79f0cecd52e2a7a56c7a4185023c271fbfa6da
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "10.1.4"
+  share_plus_platform_interface:
+    dependency: transitive
+    description:
+      name: share_plus_platform_interface
+      sha256: cc012a23fc2d479854e6c80150696c4a5f5bb62cb89af4de1c505cf78d0a5d0b
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "5.0.2"
   shared_preferences:
     dependency: "direct main"
     description:

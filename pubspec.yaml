@@ -30,6 +30,11 @@ dependencies:
   # about screen
   url_launcher: ^6.3.0
 
+  # share the audio file out to other apps (Telegram, etc.)
+  share_plus: ^10.1.4
+  # pull a dominant colour out of each cover to tint the player screen
+  palette_generator: ^0.3.3+7
+
   # state
   provider: ^6.1.2
 

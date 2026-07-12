@@ -19,6 +19,7 @@ class WaveformBar extends StatefulWidget {
     required this.onSeek,
     this.height = 48,
     this.barCount = 56,
+    this.color = accent,
   });
 
   final int seed;
@@ -27,6 +28,9 @@ class WaveformBar extends StatefulWidget {
   final ValueChanged<double> onSeek;
   final double height;
   final int barCount;
+
+  /// Colour of the played portion — defaults to the tiffany accent.
+  final Color color;
 
   @override
   State<WaveformBar> createState() => _WaveformBarState();
@@ -104,7 +108,7 @@ class _WaveformBarState extends State<WaveformBar> with SingleTickerProviderStat
                   heights: _heights,
                   progress: widget.progress.clamp(0.0, 1.0),
                   pulse: widget.playing ? _pulse.value : 0,
-                  playedColor: accent,
+                  playedColor: widget.color,
                   restColor: colors.secondaryText.withValues(alpha: 0.30),
                 ),
               ),
@@ -159,5 +163,5 @@ class _WaveformPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_WaveformPainter old) =>
-      old.progress != progress || old.pulse != pulse;
+      old.progress != progress || old.pulse != pulse || old.playedColor != playedColor;
 }

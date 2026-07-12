@@ -348,7 +348,7 @@ class _Browse extends StatelessWidget {
           cover: items.firstWhere((t) => t.coverName != null, orElse: () => items.first),
           onTap: () => Navigator.push(
             context,
-            MaterialPageRoute(builder: (_) => _GroupDetail(title: name, tracks: items)),
+            MaterialPageRoute(builder: (_) => GroupDetail(title: name, tracks: items)),
           ),
           onLongPress: () => _showGroupActions(context, name, items),
         );
@@ -484,8 +484,10 @@ class _GroupRow extends StatelessWidget {
   }
 }
 
-class _GroupDetail extends StatelessWidget {
-  const _GroupDetail({required this.title, required this.tracks});
+/// The song list for one artist or album. Public so the player screen can open
+/// an artist straight from the now-playing title.
+class GroupDetail extends StatelessWidget {
+  const GroupDetail({super.key, required this.title, required this.tracks});
 
   final String title;
   final List<Track> tracks;

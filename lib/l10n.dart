@@ -71,6 +71,7 @@ class Strings {
     required this.nowPlaying,
     required this.upNext,
     required this.queueEmpty,
+    required this.share,
     required this.sleepTimer,
     required this.cancelTimer,
     required this.playbackSpeed,
@@ -140,7 +141,7 @@ class Strings {
   final String noPlaylistsYet, playlistEmpty, addToPlaylist;
   final String playNext, addToQueue, markFavorite, unmarkFavorite;
   final String removeFromPlaylist, deleteFromLibrary, deletePlaylist;
-  final String queue, nowPlaying, upNext, queueEmpty;
+  final String queue, nowPlaying, upNext, queueEmpty, share;
   final String sleepTimer, cancelTimer, playbackSpeed, normalSpeed;
   final String settings, trackCount, storageUsed;
   final String howToAdd, howToAddBody, backgroundPlay, backgroundPlayBody;
@@ -216,6 +217,7 @@ class Strings {
     nowPlaying: 'Now playing',
     upNext: 'Up next',
     queueEmpty: 'Nothing in the queue',
+    share: 'Share',
     sleepTimer: 'Sleep timer',
     cancelTimer: 'Cancel timer',
     playbackSpeed: 'Playback speed',
@@ -330,6 +332,7 @@ class Strings {
     nowPlaying: 'در حال پخش',
     upNext: 'بعدی',
     queueEmpty: 'چیزی در صف نیست',
+    share: 'هم‌رسانی',
     sleepTimer: 'تایمر خواب',
     cancelTimer: 'لغو تایمر',
     playbackSpeed: 'سرعت پخش',
