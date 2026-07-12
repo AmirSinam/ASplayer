@@ -8,6 +8,7 @@ class DeviceSong {
     required this.album,
     required this.durationMs,
     required this.path,
+    this.albumId = 0,
   });
 
   final String title;
@@ -16,12 +17,17 @@ class DeviceSong {
   final int durationMs;
   final String path;
 
+  /// The MediaStore album this song belongs to — used to fetch the cached
+  /// album-art thumbnail when the file itself carries no embedded picture.
+  final int albumId;
+
   factory DeviceSong.fromMap(Map<dynamic, dynamic> map) => DeviceSong(
         title: (map['title'] as String?) ?? '',
         artist: (map['artist'] as String?) ?? '',
         album: (map['album'] as String?) ?? '',
         durationMs: (map['durationMs'] as num?)?.toInt() ?? 0,
         path: map['path'] as String,
+        albumId: (map['albumId'] as num?)?.toInt() ?? 0,
       );
 }
 
@@ -46,6 +52,20 @@ class DeviceMusic {
       return false;
     } on MissingPluginException {
       return false;
+    }
+  }
+
+  /// The cached album-art thumbnail for a MediaStore album, or null when there
+  /// is none (or off-Android). Used to cover device songs whose files carry no
+  /// embedded picture.
+  static Future<Uint8List?> albumArt(int albumId) async {
+    if (albumId <= 0) return null;
+    try {
+      return await _channel.invokeMethod<Uint8List>('albumArt', albumId);
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
     }
   }
 

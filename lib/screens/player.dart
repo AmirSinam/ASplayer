@@ -52,6 +52,10 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
   // Which heart to flash on the last double-tap (liked vs. unliked).
   IconData _heartIcon = Icons.favorite;
 
+  // Tints keyed by cover path — recolouring a song we've seen before is free,
+  // so revisiting or replaying never re-runs the palette work.
+  static final Map<String, Color> _tintCache = {};
+
   @override
   void initState() {
     super.initState();
@@ -75,25 +79,33 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
   /// echo it. Greyscale covers keep the tiffany accent.
   Future<void> _loadTint(Track track) async {
     final path = context.read<LibraryStore>().coverPathOf(track);
-    var tint = accent;
-    if (path != null) {
-      final file = File(path);
-      if (file.existsSync()) {
-        try {
-          final palette = await PaletteGenerator.fromImageProvider(
-            FileImage(file),
-            size: const Size(72, 72),
-            maximumColorCount: 8,
-          );
-          final picked = palette.vibrantColor?.color ??
-              palette.lightVibrantColor?.color ??
-              palette.dominantColor?.color;
-          if (picked != null) tint = _usableTint(picked);
-        } catch (_) {
-          // A decode failure just leaves the accent in place.
-        }
-      }
+    if (path == null) {
+      if (mounted) setState(() => _tint = accent);
+      return;
     }
+    final cached = _tintCache[path];
+    if (cached != null) {
+      if (mounted) setState(() => _tint = cached);
+      return;
+    }
+
+    var tint = accent;
+    try {
+      // Decode the cover small *before* quantising. PaletteGenerator otherwise
+      // decodes the full-resolution art on the UI isolate, and that decode was
+      // the little freeze when a new song started. ResizeImage keeps it tiny.
+      final palette = await PaletteGenerator.fromImageProvider(
+        ResizeImage(FileImage(File(path)), width: 64, height: 64),
+        maximumColorCount: 8,
+      );
+      final picked = palette.vibrantColor?.color ??
+          palette.lightVibrantColor?.color ??
+          palette.dominantColor?.color;
+      if (picked != null) tint = _usableTint(picked);
+    } catch (_) {
+      // A missing or undecodable cover just leaves the accent in place.
+    }
+    _tintCache[path] = tint;
     if (mounted) setState(() => _tint = tint);
   }
 

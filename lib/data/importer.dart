@@ -75,13 +75,23 @@ class Importer {
       String? coverName;
       try {
         final tags = readMetadata(file, getImage: true);
-        if (tags.pictures.isNotEmpty) {
+        final art = _firstCover(tags.pictures);
+        if (art != null) {
           coverName = '$id.img';
-          await File(p.join(store.coversDir.path, coverName))
-              .writeAsBytes(tags.pictures.first.bytes);
+          await File(p.join(store.coversDir.path, coverName)).writeAsBytes(art);
         }
       } catch (_) {
         // No readable tags: the media database entry is enough to play it.
+      }
+
+      // Most phone songs keep their art in the media database, not in the file,
+      // so fall back to the album-art thumbnail when the tags carried none.
+      if (coverName == null) {
+        final art = await DeviceMusic.albumArt(song.albumId);
+        if (art != null && art.isNotEmpty) {
+          coverName = '$id.img';
+          await File(p.join(store.coversDir.path, coverName)).writeAsBytes(art);
+        }
       }
 
       await store.add(Track(
@@ -100,6 +110,61 @@ class Importer {
 
     onProgress?.call(songs.length, songs.length);
     return added;
+  }
+
+  /// Fills in covers for songs already in the library that have none — reading
+  /// each file's own art first, then the phone's media database for linked
+  /// songs. Returns how many covers were recovered.
+  Future<int> backfillCovers({void Function(int done, int total)? onProgress}) async {
+    final missing = store.tracks.where((t) => t.coverName == null).toList();
+    if (missing.isEmpty) return 0;
+
+    // Scan the phone once, and only if some gaps are linked (device) songs.
+    final deviceByPath = <String, DeviceSong>{};
+    if (missing.any((t) => t.externalPath != null)) {
+      for (final song in await DeviceMusic.scan()) {
+        deviceByPath[song.path] = song;
+      }
+    }
+
+    var fixed = 0;
+    for (var i = 0; i < missing.length; i++) {
+      final track = missing[i];
+      onProgress?.call(i, missing.length);
+
+      List<int>? art;
+      final file = File(store.filePathOf(track));
+      if (await file.exists()) {
+        try {
+          art = _firstCover(readMetadata(file, getImage: true).pictures);
+        } catch (_) {
+          // Unreadable tags — fall through to the media database.
+        }
+      }
+      if (art == null && track.externalPath != null) {
+        final song = deviceByPath[track.externalPath];
+        if (song != null) {
+          final bytes = await DeviceMusic.albumArt(song.albumId);
+          if (bytes != null && bytes.isNotEmpty) art = bytes;
+        }
+      }
+      if (art != null && art.isNotEmpty) {
+        await store.setCover(track, art);
+        fixed++;
+      }
+    }
+    onProgress?.call(missing.length, missing.length);
+    return fixed;
+  }
+
+  /// The first embedded picture that actually carries bytes. Some files ship an
+  /// empty artwork frame, which would otherwise be saved as an undecodable
+  /// zero-byte cover that never loads.
+  List<int>? _firstCover(List<Picture> pictures) {
+    for (final picture in pictures) {
+      if (picture.bytes.isNotEmpty) return picture.bytes;
+    }
+    return null;
   }
 
   Future<Track> _readTags(
@@ -126,10 +191,10 @@ class Importer {
       lyrics = tags.lyrics?.trim() ?? '';
       durationMs = tags.duration?.inMilliseconds ?? 0;
 
-      if (tags.pictures.isNotEmpty) {
+      final art = _firstCover(tags.pictures);
+      if (art != null) {
         coverName = '$id.img';
-        await File(p.join(store.coversDir.path, coverName))
-            .writeAsBytes(tags.pictures.first.bytes);
+        await File(p.join(store.coversDir.path, coverName)).writeAsBytes(art);
       }
     } catch (_) {
       // A file with unreadable or missing tags is still a playable file.

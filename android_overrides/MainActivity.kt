@@ -1,9 +1,11 @@
 package ir.aspoormehr.asplayer
 
 import android.Manifest
+import android.content.ContentUris
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioManager
+import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
 import com.ryanheise.audioservice.AudioServiceActivity
@@ -40,6 +42,7 @@ class MainActivity : AudioServiceActivity() {
             "hasPermission" -> result.success(hasAudioPermission())
             "requestPermission" -> requestAudioPermission(result)
             "scan" -> scanInBackground(result)
+            "albumArt" -> result.success(albumArt((call.arguments as? Number)?.toLong() ?: -1L))
             "getVolume" -> result.success(musicVolume())
             "setVolume" -> {
                 setMusicVolume((call.arguments as? Double) ?: 1.0)
@@ -132,6 +135,7 @@ class MainActivity : AudioServiceActivity() {
             MediaStore.Audio.Media.ALBUM,
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.DATA,
+            MediaStore.Audio.Media.ALBUM_ID,
         )
         val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
         val order = "${MediaStore.Audio.Media.TITLE} ASC"
@@ -148,6 +152,7 @@ class MainActivity : AudioServiceActivity() {
             val albumColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
             val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
             val pathColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
+            val albumIdColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
 
             while (cursor.moveToNext()) {
                 val path = cursor.getString(pathColumn) ?: continue
@@ -161,12 +166,27 @@ class MainActivity : AudioServiceActivity() {
                         "album" to (cursor.getString(albumColumn) ?: ""),
                         "durationMs" to cursor.getLong(durationColumn),
                         "path" to path,
+                        "albumId" to cursor.getLong(albumIdColumn),
                     )
                 )
             }
         }
 
         return songs
+    }
+
+    /// The cached album thumbnail MediaStore keeps for a song's album — the one
+    /// other players show. Many files carry no embedded art, so this fills the
+    /// gap. Returns null (and the cover stays blank) on any error.
+    private fun albumArt(albumId: Long): ByteArray? {
+        if (albumId <= 0) return null
+        return try {
+            val uri = ContentUris.withAppendedId(
+                Uri.parse("content://media/external/audio/albumart"), albumId)
+            contentResolver.openInputStream(uri)?.use { it.readBytes() }
+        } catch (error: Exception) {
+            null
+        }
     }
 
     private companion object {

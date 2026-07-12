@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app_state.dart';
+import '../data/importer.dart';
 import '../data/library_store.dart';
 import '../l10n.dart';
 import '../theme.dart';
@@ -93,6 +94,20 @@ class SettingsScreen extends StatelessWidget {
 
           _Card(
             children: [
+              _title(s.restoreCovers, colors),
+              const SizedBox(height: 8),
+              Text(
+                s.restoreCoversBody,
+                style: TextStyle(fontSize: 13, height: 1.8, color: colors.secondaryText),
+              ),
+              const SizedBox(height: 14),
+              const _RestoreCoversButton(),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          _Card(
+            children: [
               _title(s.howToAdd, colors),
               const SizedBox(height: 8),
               Text(
@@ -136,6 +151,53 @@ class SettingsScreen extends StatelessWidget {
           ),
         ],
       );
+}
+
+class _RestoreCoversButton extends StatefulWidget {
+  const _RestoreCoversButton();
+
+  @override
+  State<_RestoreCoversButton> createState() => _RestoreCoversButtonState();
+}
+
+class _RestoreCoversButtonState extends State<_RestoreCoversButton> {
+  bool _running = false;
+
+  Future<void> _run() async {
+    final s = context.read<AppState>().s;
+    final importer = context.read<Importer>();
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _running = true);
+    final count = await importer.backfillCovers();
+    if (!mounted) return;
+    setState(() => _running = false);
+    messenger.showSnackBar(SnackBar(content: Text(s.coversRestored(count))));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.watch<AppState>().s;
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton.icon(
+        onPressed: _running ? null : _run,
+        icon: _running
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: onAccent),
+              )
+            : const Icon(Icons.image_outlined, size: 18),
+        label: Text(_running ? s.scanningPhone : s.restoreCovers),
+        style: FilledButton.styleFrom(
+          backgroundColor: accent,
+          foregroundColor: onAccent,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: const StadiumBorder(),
+        ),
+      ),
+    );
+  }
 }
 
 class _AboutCard extends StatelessWidget {
