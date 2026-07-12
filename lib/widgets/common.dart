@@ -12,31 +12,56 @@ import '../theme.dart';
 import 'import_device_button.dart';
 
 class Artwork extends StatelessWidget {
-  const Artwork({super.key, required this.track, this.radius = R.row, this.size});
+  const Artwork({
+    super.key,
+    required this.track,
+    this.radius = R.row,
+    this.size,
+    this.cacheWidth,
+  });
 
   final Track? track;
   final double radius;
   final double? size;
 
+  /// Overrides the decode width. When null it is derived from [size]; a null
+  /// result (no size given) decodes at full resolution — reserve that for the
+  /// one big player cover, never for list thumbnails.
+  final int? cacheWidth;
+
   @override
   Widget build(BuildContext context) {
     final store = context.read<LibraryStore>();
     final path = track == null ? null : store.coverPathOf(track!);
-    final file = path == null ? null : File(path);
+
+    final fallback = DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.08)],
+        ),
+      ),
+      child: const Center(child: Icon(Icons.music_note, color: accent, size: 20)),
+    );
 
     Widget child;
-    if (file != null && file.existsSync()) {
-      child = Image.file(file, fit: BoxFit.cover, gaplessPlayback: true);
+    if (path == null) {
+      child = fallback;
     } else {
-      child = DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.08)],
-          ),
-        ),
-        child: const Center(child: Icon(Icons.music_note, color: accent, size: 20)),
+      // Decode the cover only as large as it is shown. A full-resolution album
+      // art scaled into a 48px tile burns memory and decode time and was the main
+      // source of list jank. A missing file falls back via errorBuilder, which
+      // also drops the synchronous existsSync() that used to run every build.
+      final dpr = MediaQuery.of(context).devicePixelRatio;
+      final decodeWidth = cacheWidth ?? (size != null ? (size! * dpr).round() : null);
+      child = Image.file(
+        File(path),
+        fit: BoxFit.cover,
+        gaplessPlayback: true,
+        cacheWidth: decodeWidth,
+        filterQuality: FilterQuality.low,
+        errorBuilder: (_, __, ___) => fallback,
       );
     }
 
@@ -250,7 +275,7 @@ class SongCard extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Artwork(track: track, radius: R.tile),
+              Artwork(track: track, radius: R.tile, cacheWidth: 450),
               const DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(

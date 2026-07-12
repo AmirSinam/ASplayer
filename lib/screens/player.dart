@@ -323,7 +323,7 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                               ),
                             ],
                           ),
-                          child: Artwork(track: track, radius: R.card),
+                          child: Artwork(track: track, radius: R.card, cacheWidth: 1000),
                         ),
                       ),
                     ),
