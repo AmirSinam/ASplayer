@@ -18,11 +18,10 @@
 
     <ImageView
         android:id="@+id/widget_play"
-        android:layout_width="52dp"
-        android:layout_height="52dp"
+        android:layout_width="54dp"
+        android:layout_height="54dp"
         android:layout_gravity="center"
-        android:padding="13dp"
-        android:background="@drawable/widget_glass_circle"
+        android:scaleType="fitCenter"
         android:src="@drawable/ic_widget_play"
         android:contentDescription="@null" />
 </FrameLayout>
