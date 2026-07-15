@@ -124,6 +124,11 @@ class Strings {
     required this.crossfade,
     required this.crossfadeBody,
     required this.secondsLabel,
+    required this.equalizer,
+    required this.equalizerBody,
+    required this.eqAndroidOnly,
+    required this.eqPlayToTune,
+    required this.eqReset,
     required this.about,
     required this.aboutTagline,
     required this.developedBy,
@@ -167,6 +172,7 @@ class Strings {
   final String autoImport, autoImportBody;
   final String crossfade, crossfadeBody;
   final String Function(int) secondsLabel;
+  final String equalizer, equalizerBody, eqAndroidOnly, eqPlayToTune, eqReset;
   final String Function(int) coversRestored;
   final String about, aboutTagline, developedBy, visitWebsite, versionLabel;
   final String unknownArtist, noAlbum;
@@ -289,6 +295,11 @@ class Strings {
     crossfadeBody:
         'The next song eases in over the current one instead of cutting sharply. Choose how long the blend lasts.',
     secondsLabel: _enSeconds,
+    equalizer: 'Equalizer',
+    equalizerBody: 'Shape the sound with ready‑made modes, or fine‑tune the bands yourself.',
+    eqAndroidOnly: 'The equalizer is available on Android only.',
+    eqPlayToTune: 'Play a song to fine‑tune the bands.',
+    eqReset: 'Reset',
     about: 'About',
     aboutTagline: 'Your own music, on your own phone. No account, no ads, no internet.',
     developedBy: 'Built by',
@@ -415,6 +426,11 @@ class Strings {
     crossfadeBody:
         'آهنگ بعدی به‌جای قطعِ ناگهانی، نرم روی آهنگ فعلی محو می‌شود. طول محوشدن را انتخاب کن.',
     secondsLabel: _faSeconds,
+    equalizer: 'اکولایزر',
+    equalizerBody: 'صدا را با حالت‌های آماده تنظیم کن، یا باندها را دستی میزان کن.',
+    eqAndroidOnly: 'اکولایزر فقط روی اندروید در دسترس است.',
+    eqPlayToTune: 'برای تنظیم دستی باندها، یک آهنگ پخش کن.',
+    eqReset: 'بازنشانی',
     about: 'درباره',
     aboutTagline: 'موزیک خودت، روی گوشی خودت. بدون حساب کاربری، بدون تبلیغات، بدون اینترنت.',
     developedBy: 'ساخته‌ی',

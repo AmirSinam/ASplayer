@@ -11,11 +11,20 @@ import '../data/library_store.dart';
 import '../data/widget_bridge.dart';
 import '../models.dart';
 import '../platform.dart';
+import 'eq_presets.dart';
 
 /// Owns playback and the queue. The audio_service handler below is a thin shell
 /// that forwards notification / headphone commands here.
 class PlayerController extends ChangeNotifier {
   PlayerController(this.store) {
+    _eqs = [AndroidEqualizer(), AndroidEqualizer()];
+    _players = List.generate(
+      2,
+      (i) => Plat.isAndroid
+          ? AudioPlayer(audioPipeline: AudioPipeline(androidAudioEffects: [_eqs[i]]))
+          : AudioPlayer(),
+    );
+
     // A listener on each player; only the active one drives state and advance.
     for (final p in _players) {
       p.playerStateStream.listen((state) {
@@ -29,6 +38,7 @@ class PlayerController extends ChangeNotifier {
       p.positionStream.listen((pos) => _maybeCrossfade(p, pos));
     }
     _loadCrossfadePrefs();
+    _loadEqPrefs();
     // Start the slider matching the phone's current media volume (Android).
     if (Plat.isAndroid) {
       DeviceMusic.getVolume().then((v) {
@@ -42,10 +52,17 @@ class PlayerController extends ChangeNotifier {
 
   // Two players so the next track can fade in while the current one fades out.
   // The idle player stays paused and silent unless a crossfade is happening.
-  final List<AudioPlayer> _players = [AudioPlayer(), AudioPlayer()];
+  // One equalizer per player (Android only); attached disabled it is a safe
+  // passthrough, so it never colours the sound until the user turns it on.
+  late final List<AndroidEqualizer> _eqs;
+  late final List<AudioPlayer> _players;
   int _active = 0;
   AudioPlayer get _player => _players[_active];
   AudioPlayer get _idle => _players[1 - _active];
+
+  bool _eqEnabled = false;
+  String _eqPreset = 'flat';
+  List<double> _eqGains = [];
 
   // Crossfade is off by default; when off, playback takes the exact same
   // single-player path it always did.
@@ -78,6 +95,11 @@ class PlayerController extends ChangeNotifier {
   double get volume => _volume;
   bool get crossfade => _crossfade;
   int get crossfadeSeconds => _crossfadeSeconds;
+  bool get eqAvailable => Plat.isAndroid;
+  bool get eqEnabled => _eqEnabled;
+  String get eqPreset => _eqPreset;
+  List<double> get eqGains => List.unmodifiable(_eqGains);
+  Future<AndroidEqualizerParameters> get eqParameters => _eqs[0].parameters;
   Duration? get sleepRemaining => _sleepRemaining;
 
   Stream<Duration> get positionStream => _player.positionStream;
@@ -333,6 +355,7 @@ class PlayerController extends ChangeNotifier {
     }
     await incoming.setSpeed(_speed);
     await incoming.setVolume(0);
+    unawaited(_reapplyEq());
     await incoming.play();
 
     // The incoming track is now the one on screen and in the notification.
@@ -376,6 +399,87 @@ class PlayerController extends ChangeNotifier {
     }
   }
 
+  // MARK: - Equalizer (Android only)
+
+  Future<void> _loadEqPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    _eqEnabled = prefs.getBool('eqEnabled') ?? false;
+    _eqPreset = prefs.getString('eqPreset') ?? 'flat';
+    final g = prefs.getString('eqGains');
+    _eqGains = (g == null || g.isEmpty)
+        ? <double>[]
+        : g.split(',').map((e) => double.tryParse(e) ?? 0.0).toList();
+    notifyListeners();
+  }
+
+  Future<void> setEqEnabled(bool enabled) async {
+    _eqEnabled = enabled;
+    (await SharedPreferences.getInstance()).setBool('eqEnabled', enabled);
+    if (Plat.isAndroid) {
+      for (final eq in _eqs) {
+        await eq.setEnabled(enabled);
+      }
+      if (enabled) await _reapplyEq();
+    }
+    notifyListeners();
+  }
+
+  Future<void> applyEqPreset(String id) async {
+    _eqPreset = id;
+    (await SharedPreferences.getInstance()).setString('eqPreset', id);
+    if (Plat.isAndroid && _eqEnabled) await _reapplyEq();
+    notifyListeners();
+  }
+
+  /// Nudges a single band; this turns the mode into a custom curve.
+  Future<void> setEqBand(int index, double db) async {
+    if (!Plat.isAndroid) return;
+    final params = await _eqs[0].parameters;
+    if (index < 0 || index >= params.bands.length) return;
+    if (_eqGains.length != params.bands.length) {
+      _eqGains = params.bands.map((b) => b.gain).toList();
+    }
+    final clamped = db.clamp(params.minDecibels, params.maxDecibels).toDouble();
+    _eqGains[index] = clamped;
+    _eqPreset = 'custom';
+    for (final eq in _eqs) {
+      final p = await eq.parameters;
+      if (index < p.bands.length) await p.bands[index].setGain(clamped);
+    }
+    final prefs = await SharedPreferences.getInstance();
+    prefs.setString('eqPreset', 'custom');
+    prefs.setString('eqGains', _eqGains.join(','));
+    notifyListeners();
+  }
+
+  /// Pushes the current preset (or saved custom gains) onto both equalizers.
+  /// Runs off the playback path — a new audio session can reset effects, so it
+  /// is re-applied after each track loads. Never awaited by [_load], so a slow
+  /// or never-completing [parameters] future can't stall playback.
+  Future<void> _reapplyEq() async {
+    if (!Plat.isAndroid || !_eqEnabled) return;
+    final params = await _eqs[0].parameters;
+    List<double> gains;
+    if (_eqPreset == 'custom' && _eqGains.length == params.bands.length) {
+      gains = _eqGains;
+    } else {
+      final preset =
+          eqPresets.firstWhere((p) => p.id == _eqPreset, orElse: () => eqPresets.first);
+      gains = params.bands
+          .map((b) => b.centerFrequency)
+          .map((f) => preset.gainAt(f).clamp(params.minDecibels, params.maxDecibels).toDouble())
+          .toList();
+      _eqGains = gains;
+    }
+    for (final eq in _eqs) {
+      await eq.setEnabled(true);
+      final p = await eq.parameters;
+      for (var i = 0; i < p.bands.length && i < gains.length; i++) {
+        await p.bands[i].setGain(gains[i]);
+      }
+    }
+  }
+
   // MARK: - Internals
 
   /// [auto] means playback reached the end of a track on its own, which is the
@@ -410,6 +514,7 @@ class PlayerController extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    unawaited(_reapplyEq());
 
     // Tag duration is often wrong or missing; trust the decoder.
     final decoded = _player.duration;
