@@ -119,6 +119,8 @@ class Strings {
     required this.restoreCovers,
     required this.restoreCoversBody,
     required this.coversRestored,
+    required this.autoImport,
+    required this.autoImportBody,
     required this.about,
     required this.aboutTagline,
     required this.developedBy,
@@ -159,6 +161,7 @@ class Strings {
   final String noSongsOnPhone, permissionNeeded, importing;
   final String Function(int) imported;
   final String restoreCovers, restoreCoversBody;
+  final String autoImport, autoImportBody;
   final String Function(int) coversRestored;
   final String about, aboutTagline, developedBy, visitWebsite, versionLabel;
   final String unknownArtist, noAlbum;
@@ -274,6 +277,9 @@ class Strings {
     restoreCoversBody:
         'Finds artwork for songs that show no cover — from the file itself, or from your phone’s media library.',
     coversRestored: _enCoversRestored,
+    autoImport: 'Auto‑import new songs',
+    autoImportBody:
+        'Any song you save on your phone from anywhere — a browser, Telegram, Rubika, or the share sheet — is added to your library automatically.',
     about: 'About',
     aboutTagline: 'Your own music, on your own phone. No account, no ads, no internet.',
     developedBy: 'Built by',
@@ -393,6 +399,9 @@ class Strings {
     restoreCoversBody:
         'برای آهنگ‌هایی که کاور نشان نمی‌دهند، کاور را پیدا می‌کند — از خود فایل یا از حافظه‌ی موزیک گوشی.',
     coversRestored: _faCoversRestored,
+    autoImport: 'ورود خودکار آهنگ‌ها',
+    autoImportBody:
+        'هر آهنگی که از هرجا توی گوشی ذخیره کنی — مرورگر، تلگرام، روبیکا، یا برگه‌ی اشتراک‌گذاری — خودکار به کتابخانه اضافه می‌شود.',
     about: 'درباره',
     aboutTagline: 'موزیک خودت، روی گوشی خودت. بدون حساب کاربری، بدون تبلیغات، بدون اینترنت.',
     developedBy: 'ساخته‌ی',

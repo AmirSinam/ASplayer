@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app_state.dart';
+import '../data/device_music.dart';
 import '../data/importer.dart';
 import '../data/library_store.dart';
 import '../l10n.dart';
@@ -88,6 +89,23 @@ class SettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               const ImportDeviceButton(filled: false),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          _Card(
+            children: [
+              Row(
+                children: [
+                  Expanded(child: _title(s.autoImport, colors)),
+                  const _AutoImportSwitch(),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                s.autoImportBody,
+                style: TextStyle(fontSize: 13, height: 1.8, color: colors.secondaryText),
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -196,6 +214,62 @@ class _RestoreCoversButtonState extends State<_RestoreCoversButton> {
           shape: const StadiumBorder(),
         ),
       ),
+    );
+  }
+}
+
+/// Turns the background library sync on or off. Enabling asks for the media
+/// permission and pulls in whatever is already there straight away.
+class _AutoImportSwitch extends StatefulWidget {
+  const _AutoImportSwitch();
+
+  @override
+  State<_AutoImportSwitch> createState() => _AutoImportSwitchState();
+}
+
+class _AutoImportSwitchState extends State<_AutoImportSwitch> {
+  bool _busy = false;
+
+  Future<void> _toggle(bool value) async {
+    final app = context.read<AppState>();
+    final importer = context.read<Importer>();
+    final messenger = ScaffoldMessenger.of(context);
+    final s = app.s;
+
+    if (!value) {
+      app.deviceSyncEnabled = false;
+      return;
+    }
+
+    if (!await DeviceMusic.requestPermission()) {
+      messenger.showSnackBar(SnackBar(content: Text(s.permissionNeeded)));
+      return;
+    }
+    app.deviceSyncEnabled = true;
+
+    // Sweep in anything already sitting on the phone right now.
+    setState(() => _busy = true);
+    final songs = await DeviceMusic.scan();
+    final added = songs.isEmpty ? 0 : await importer.linkDeviceSongs(songs);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    messenger.showSnackBar(SnackBar(content: Text(s.imported(added))));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    if (_busy) {
+      return const SizedBox(
+        width: 26,
+        height: 26,
+        child: CircularProgressIndicator(strokeWidth: 2, color: accent),
+      );
+    }
+    return Switch(
+      value: app.deviceSyncEnabled,
+      activeThumbColor: accent,
+      onChanged: _toggle,
     );
   }
 }

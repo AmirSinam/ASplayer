@@ -46,8 +46,10 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) _syncDeviceSongs();
   }
 
-  /// Silently links songs added to the phone since last time. Only runs once the
-  /// user has opted in by importing the phone's library at least once.
+  /// Links songs added to the phone since last time. Runs on launch and every
+  /// time the app comes forward, so a track saved from anywhere — a browser,
+  /// Telegram, Rubika, the share sheet — turns up on its own. Only active once
+  /// the user has opted in.
   Future<void> _syncDeviceSongs() async {
     final app = context.read<AppState>();
     if (!app.deviceSyncEnabled) return;
@@ -55,7 +57,33 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
 
     final songs = await DeviceMusic.scan();
     if (songs.isEmpty || !mounted) return;
-    await context.read<Importer>().linkDeviceSongs(songs);
+    final added = await context.read<Importer>().linkDeviceSongs(songs);
+    _notifyAdded(added);
+  }
+
+  /// A small banner telling the user how many songs just landed. Shown when the
+  /// app is in front (which is when device sync runs), so it reads like a
+  /// notification without needing a background service.
+  void _notifyAdded(int count) {
+    if (count <= 0 || !mounted) return;
+    final s = context.read<AppState>().s;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: accent,
+        duration: const Duration(seconds: 3),
+        content: Row(
+          children: [
+            const Icon(Icons.library_add_check_rounded, color: onAccent, size: 20),
+            const SizedBox(width: 10),
+            Text(
+              s.imported(count),
+              style: const TextStyle(color: onAccent, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Files arriving from Telegram's share sheet, both while running and on a
@@ -64,13 +92,15 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
     if (!Plat.isMobile) return;
     final importer = context.read<Importer>();
 
-    _shareSub = ReceiveSharingIntent.instance.getMediaStream().listen((files) {
-      importer.importPaths(files.map((f) => f.path));
+    _shareSub = ReceiveSharingIntent.instance.getMediaStream().listen((files) async {
+      final added = await importer.importPaths(files.map((f) => f.path));
+      _notifyAdded(added);
     });
 
-    ReceiveSharingIntent.instance.getInitialMedia().then((files) {
+    ReceiveSharingIntent.instance.getInitialMedia().then((files) async {
       if (files.isEmpty) return;
-      importer.importPaths(files.map((f) => f.path));
+      final added = await importer.importPaths(files.map((f) => f.path));
+      _notifyAdded(added);
       ReceiveSharingIntent.instance.reset();
     });
   }
