@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/device_music.dart';
 import '../data/library_store.dart';
@@ -15,13 +16,19 @@ import '../platform.dart';
 /// that forwards notification / headphone commands here.
 class PlayerController extends ChangeNotifier {
   PlayerController(this.store) {
-    _player.playerStateStream.listen((state) {
-      if (state.processingState == ProcessingState.completed) {
-        _advance(auto: true);
-      }
-      _publish();
-      notifyListeners();
-    });
+    // A listener on each player; only the active one drives state and advance.
+    for (final p in _players) {
+      p.playerStateStream.listen((state) {
+        if (p != _player) return; // the fading-out player is ignored
+        if (state.processingState == ProcessingState.completed) {
+          _advance(auto: true);
+        }
+        _publish();
+        notifyListeners();
+      });
+      p.positionStream.listen((pos) => _maybeCrossfade(p, pos));
+    }
+    _loadCrossfadePrefs();
     // Start the slider matching the phone's current media volume (Android).
     if (Plat.isAndroid) {
       DeviceMusic.getVolume().then((v) {
@@ -32,7 +39,20 @@ class PlayerController extends ChangeNotifier {
   }
 
   final LibraryStore store;
-  final AudioPlayer _player = AudioPlayer();
+
+  // Two players so the next track can fade in while the current one fades out.
+  // The idle player stays paused and silent unless a crossfade is happening.
+  final List<AudioPlayer> _players = [AudioPlayer(), AudioPlayer()];
+  int _active = 0;
+  AudioPlayer get _player => _players[_active];
+  AudioPlayer get _idle => _players[1 - _active];
+
+  // Crossfade is off by default; when off, playback takes the exact same
+  // single-player path it always did.
+  bool _crossfade = false;
+  int _crossfadeSeconds = 6;
+  bool _fading = false;
+  Timer? _fadeTimer;
 
   ASAudioHandler? _handler;
   void attach(ASAudioHandler handler) => _handler = handler;
@@ -56,6 +76,8 @@ class PlayerController extends ChangeNotifier {
   Repeat get repeat => _repeat;
   double get speed => _speed;
   double get volume => _volume;
+  bool get crossfade => _crossfade;
+  int get crossfadeSeconds => _crossfadeSeconds;
   Duration? get sleepRemaining => _sleepRemaining;
 
   Stream<Duration> get positionStream => _player.positionStream;
@@ -78,6 +100,7 @@ class PlayerController extends ChangeNotifier {
   // MARK: - Transport
 
   Future<void> play(Track track, List<Track> tracks) async {
+    _cancelFade();
     _original = [...tracks];
     _queue = [...tracks];
     if (_shuffle) _reshuffle(keeping: track);
@@ -92,11 +115,22 @@ class PlayerController extends ChangeNotifier {
     await _player.play();
   }
 
-  Future<void> pause() => _player.pause();
+  Future<void> pause() async {
+    _cancelFade();
+    await _player.pause();
+  }
 
-  Future<void> next() => _advance(auto: false);
+  Future<void> next() {
+    // With crossfade on, slide into the next track instead of cutting to it.
+    if (_crossfade && !_fading && _queue.isNotEmpty) {
+      final target = _queue[(_index + 1) % _queue.length];
+      if (target.id != _current?.id) return _crossfadeTo(target);
+    }
+    return _advance(auto: false);
+  }
 
   Future<void> previous() async {
+    _cancelFade();
     if (_queue.isEmpty) return;
     // Standard behaviour: restart the track unless we're near the beginning.
     if (_player.position > const Duration(seconds: 3)) {
@@ -232,12 +266,123 @@ class PlayerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // MARK: - Crossfade
+
+  Future<void> _loadCrossfadePrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    _crossfade = prefs.getBool('crossfade') ?? false;
+    _crossfadeSeconds = prefs.getInt('crossfadeSeconds') ?? 6;
+    notifyListeners();
+  }
+
+  Future<void> setCrossfade(bool enabled) async {
+    _crossfade = enabled;
+    if (!enabled) _cancelFade();
+    (await SharedPreferences.getInstance()).setBool('crossfade', enabled);
+    notifyListeners();
+  }
+
+  Future<void> setCrossfadeSeconds(int seconds) async {
+    _crossfadeSeconds = seconds.clamp(2, 12);
+    (await SharedPreferences.getInstance()).setInt('crossfadeSeconds', _crossfadeSeconds);
+    notifyListeners();
+  }
+
+  /// On Android the player runs at full and the system controls loudness, so the
+  /// resting level is 1. On desktop the player's own volume is the user's level.
+  double get _restingVolume => Plat.isAndroid ? 1.0 : _volume;
+
+  /// The track auto-play would move to next — or null when it would loop the
+  /// same track or stop at the end. Used to decide whether an early crossfade
+  /// makes sense.
+  Track? _nextTrackForAuto() {
+    if (_queue.isEmpty) return null;
+    if (_repeat == Repeat.one) return null;
+    final isLast = _index == _queue.length - 1;
+    if (isLast && _repeat == Repeat.off) return null;
+    return _queue[(_index + 1) % _queue.length];
+  }
+
+  /// Fired for every position tick of the active player: once the track is
+  /// inside the crossfade window of its end, start sliding into the next one.
+  void _maybeCrossfade(AudioPlayer p, Duration pos) {
+    if (!_crossfade || _fading || p != _player) return;
+    final total = _player.duration;
+    if (total == null || total == Duration.zero) return;
+    final window = Duration(seconds: _crossfadeSeconds);
+    // Skip very short tracks, and don't trigger in the opening seconds.
+    if (pos < window) return;
+    final remaining = total - pos;
+    if (remaining.isNegative || remaining > window) return;
+    final target = _nextTrackForAuto();
+    if (target == null || target.id == _current?.id) return;
+    _crossfadeTo(target);
+  }
+
+  /// Loads [track] into the idle player, makes it the active one, then ramps the
+  /// two volumes past each other over the crossfade window.
+  Future<void> _crossfadeTo(Track track) async {
+    _fading = true;
+    final outgoing = _player;
+    final incoming = _idle;
+    try {
+      await incoming.setFilePath(store.filePathOf(track));
+    } catch (_) {
+      _fading = false;
+      return; // couldn't load; the outgoing track keeps playing as normal
+    }
+    await incoming.setSpeed(_speed);
+    await incoming.setVolume(0);
+    await incoming.play();
+
+    // The incoming track is now the one on screen and in the notification.
+    _active = 1 - _active;
+    _current = track;
+    await store.markPlayed(track);
+    _publish();
+    notifyListeners();
+
+    final rest = _restingVolume;
+    const steps = 24;
+    final stepMs = (_crossfadeSeconds * 1000 / steps).round();
+    var i = 0;
+    _fadeTimer?.cancel();
+    _fadeTimer = Timer.periodic(Duration(milliseconds: stepMs), (t) {
+      i++;
+      final f = (i / steps).clamp(0.0, 1.0);
+      incoming.setVolume(f * rest);
+      outgoing.setVolume((1 - f) * rest);
+      if (i >= steps) {
+        t.cancel();
+        outgoing.pause();
+        outgoing.seek(Duration.zero);
+        outgoing.setVolume(rest); // reset so it is ready to be reused
+        _fading = false;
+      }
+    });
+  }
+
+  /// Aborts a fade in progress: the active (incoming) track jumps to full and
+  /// the other is silenced. Called before any hard track change.
+  void _cancelFade() {
+    _fadeTimer?.cancel();
+    _fadeTimer = null;
+    if (_fading) {
+      final rest = _restingVolume;
+      _player.setVolume(rest);
+      _idle.pause();
+      _idle.setVolume(rest);
+      _fading = false;
+    }
+  }
+
   // MARK: - Internals
 
   /// [auto] means playback reached the end of a track on its own, which is the
   /// only case where repeat mode has a say.
   Future<void> _advance({required bool auto}) async {
     if (_queue.isEmpty) return;
+    _cancelFade();
 
     if (auto && _repeat == Repeat.one) {
       await seek(Duration.zero);
@@ -327,7 +472,10 @@ class PlayerController extends ChangeNotifier {
   @override
   void dispose() {
     _sleepTimer?.cancel();
-    _player.dispose();
+    _fadeTimer?.cancel();
+    for (final p in _players) {
+      p.dispose();
+    }
     super.dispose();
   }
 }

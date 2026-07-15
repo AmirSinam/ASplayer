@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../app_state.dart';
+import '../audio/player_controller.dart';
 import '../data/device_music.dart';
 import '../data/importer.dart';
 import '../data/library_store.dart';
@@ -108,6 +109,9 @@ class SettingsScreen extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 14),
+
+          const _CrossfadeCard(),
           const SizedBox(height: 14),
 
           _Card(
@@ -270,6 +274,76 @@ class _AutoImportSwitchState extends State<_AutoImportSwitch> {
       value: app.deviceSyncEnabled,
       activeThumbColor: accent,
       onChanged: _toggle,
+    );
+  }
+}
+
+class _CrossfadeCard extends StatelessWidget {
+  const _CrossfadeCard();
+
+  static const _choices = [2, 4, 6, 8, 10];
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final s = context.watch<AppState>().s;
+    final player = context.watch<PlayerController>();
+
+    return _Card(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                s.crossfade,
+                style: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold, color: colors.primaryText),
+              ),
+            ),
+            Switch(
+              value: player.crossfade,
+              activeThumbColor: accent,
+              onChanged: player.setCrossfade,
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          s.crossfadeBody,
+          style: TextStyle(fontSize: 13, height: 1.8, color: colors.secondaryText),
+        ),
+        if (player.crossfade) ...[
+          const SizedBox(height: 14),
+          Row(
+            children: _choices.map((sec) {
+              final selected = player.crossfadeSeconds == sec;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => player.setCrossfadeSeconds(sec),
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: selected ? accent : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: selected ? accent : colors.rim),
+                    ),
+                    child: Text(
+                      s.secondsLabel(sec),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: selected ? onAccent : colors.secondaryText,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ],
     );
   }
 }

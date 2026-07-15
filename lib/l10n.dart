@@ -121,6 +121,9 @@ class Strings {
     required this.coversRestored,
     required this.autoImport,
     required this.autoImportBody,
+    required this.crossfade,
+    required this.crossfadeBody,
+    required this.secondsLabel,
     required this.about,
     required this.aboutTagline,
     required this.developedBy,
@@ -162,6 +165,8 @@ class Strings {
   final String Function(int) imported;
   final String restoreCovers, restoreCoversBody;
   final String autoImport, autoImportBody;
+  final String crossfade, crossfadeBody;
+  final String Function(int) secondsLabel;
   final String Function(int) coversRestored;
   final String about, aboutTagline, developedBy, visitWebsite, versionLabel;
   final String unknownArtist, noAlbum;
@@ -280,6 +285,10 @@ class Strings {
     autoImport: 'Auto‑import new songs',
     autoImportBody:
         'Any song you save on your phone from anywhere — a browser, Telegram, Rubika, or the share sheet — is added to your library automatically.',
+    crossfade: 'Crossfade',
+    crossfadeBody:
+        'The next song eases in over the current one instead of cutting sharply. Choose how long the blend lasts.',
+    secondsLabel: _enSeconds,
     about: 'About',
     aboutTagline: 'Your own music, on your own phone. No account, no ads, no internet.',
     developedBy: 'Built by',
@@ -402,6 +411,10 @@ class Strings {
     autoImport: 'ورود خودکار آهنگ‌ها',
     autoImportBody:
         'هر آهنگی که از هرجا توی گوشی ذخیره کنی — مرورگر، تلگرام، روبیکا، یا برگه‌ی اشتراک‌گذاری — خودکار به کتابخانه اضافه می‌شود.',
+    crossfade: 'میکس نرم (کراس‌فید)',
+    crossfadeBody:
+        'آهنگ بعدی به‌جای قطعِ ناگهانی، نرم روی آهنگ فعلی محو می‌شود. طول محوشدن را انتخاب کن.',
+    secondsLabel: _faSeconds,
     about: 'درباره',
     aboutTagline: 'موزیک خودت، روی گوشی خودت. بدون حساب کاربری، بدون تبلیغات، بدون اینترنت.',
     developedBy: 'ساخته‌ی',
@@ -425,6 +438,7 @@ String _enMinutes(int n) => '$n minutes';
 String _enSleepsIn(String t) => 'Stops in $t';
 String _enTotal(int m) => m < 60 ? '$m min' : '${m ~/ 60} h ${m % 60} min';
 String _enCoversRestored(int n) => n == 0 ? 'No new covers found' : '$n covers restored';
+String _enSeconds(int n) => '${n}s';
 
 String _faSelected(int n) => '$n انتخاب شد';
 String _faImported(int n) => '$n آهنگ اضافه شد';
@@ -434,3 +448,4 @@ String _faMinutes(int n) => '$n دقیقه';
 String _faSleepsIn(String t) => 'خاموش می‌شود تا $t';
 String _faTotal(int m) => m < 60 ? '$m دقیقه' : '${m ~/ 60} ساعت و ${m % 60} دقیقه';
 String _faCoversRestored(int n) => n == 0 ? 'کاور تازه‌ای پیدا نشد' : '$n کاور بازیابی شد';
+String _faSeconds(int n) => '$n ثانیه';
