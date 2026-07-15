@@ -10,7 +10,6 @@ import '../data/library_store.dart';
 import '../l10n.dart';
 import '../theme.dart';
 import '../widgets/import_device_button.dart';
-import 'equalizer.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -109,39 +108,6 @@ class SettingsScreen extends StatelessWidget {
                 style: TextStyle(fontSize: 13, height: 1.8, color: colors.secondaryText),
               ),
             ],
-          ),
-          const SizedBox(height: 14),
-
-          GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const EqualizerScreen()),
-            ),
-            child: _Card(
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.graphic_eq, color: accent, size: 22),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _title(s.equalizer, colors),
-                          const SizedBox(height: 4),
-                          Text(
-                            s.equalizerBody,
-                            style: TextStyle(
-                                fontSize: 13, height: 1.6, color: colors.secondaryText),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.chevron_left, color: colors.secondaryText),
-                  ],
-                ),
-              ],
-            ),
           ),
           const SizedBox(height: 14),
 
