@@ -59,7 +59,15 @@ class PlayerController extends ChangeNotifier {
   Duration _fadeElapsed = Duration.zero; // progress banked across pauses
   DateTime? _fadeAnchor; // wall-clock start of the current running span
   AudioPlayer? _fadeOut; // the deck fading out
-  bool get _crossfading => _fade != _FadeState.idle;
+  bool get crossfading => _fade != _FadeState.idle;
+
+  // Surfaced for the on-screen mix transition. [fadeProgress] runs 0→1 across a
+  // blend (frozen while paused); [fadingOutTrack] is the track leaving. The UI
+  // listens to the notifier directly so only the transition repaints, not the
+  // whole screen.
+  final ValueNotifier<double> fadeProgress = ValueNotifier<double>(0);
+  Track? _fadingOut;
+  Track? get fadingOutTrack => _fadingOut;
 
   ASAudioHandler? _handler;
   void attach(ASAudioHandler handler) => _handler = handler;
@@ -128,7 +136,7 @@ class PlayerController extends ChangeNotifier {
   }
 
   Future<void> pause() async {
-    if (_crossfading) {
+    if (crossfading) {
       _pauseCrossfade();
       return;
     }
@@ -158,7 +166,7 @@ class PlayerController extends ChangeNotifier {
   Future<void> seek(Duration position) async {
     // Seeking during a blend collapses it: the incoming track becomes the sole
     // track, then the seek applies to it.
-    if (_crossfading) _endCrossfade();
+    if (crossfading) _endCrossfade();
     await _player.seek(position);
     _publish();
   }
@@ -294,7 +302,7 @@ class PlayerController extends ChangeNotifier {
   // States: idle (single deck) → running (both decks, ramping) → idle. A blend
   // can also be paused (frozen) or ended early (collapsed to the incoming deck).
 
-  static const _fadeTick = Duration(milliseconds: 50);
+  static const _fadeTick = Duration(milliseconds: 33); // ~30fps for a smooth ramp
 
   Future<void> _loadCrossfadePrefs() async {
     final prefs = await SharedPreferences.getInstance();
@@ -363,6 +371,7 @@ class PlayerController extends ChangeNotifier {
     _fade = _FadeState.running;
     final outgoing = _player;
     final incoming = _idle;
+    final outgoingTrack = _current; // captured before _current becomes the next
 
     try {
       await incoming.setFilePath(store.filePathOf(track));
@@ -391,6 +400,8 @@ class PlayerController extends ChangeNotifier {
     }
 
     _fadeOut = outgoing;
+    _fadingOut = outgoingTrack;
+    fadeProgress.value = 0;
     _active = 1 - _active; // incoming is now the active/visible track
     _current = track;
     await store.markPlayed(track);
@@ -421,6 +432,7 @@ class PlayerController extends ChangeNotifier {
     // Equal-power curve: perceived loudness stays steady through the blend.
     _player.setVolume(sin(t * pi / 2) * rest); // incoming (active)
     _fadeOut?.setVolume(cos(t * pi / 2) * rest); // outgoing
+    fadeProgress.value = t; // drives the on-screen mix transition
     if (t >= 1.0) _endCrossfade();
   }
 
@@ -430,17 +442,21 @@ class PlayerController extends ChangeNotifier {
   void _endCrossfade() {
     _fadeTicker?.cancel();
     _fadeTicker = null;
+    final wasFading = crossfading;
     final out = _fadeOut;
     if (out != null) {
       out.pause();
       out.seek(Duration.zero);
       out.setVolume(_restingVolume); // reset so it is ready to be reused
     }
-    if (_crossfading) _player.setVolume(_restingVolume); // incoming to full
+    if (wasFading) _player.setVolume(_restingVolume); // incoming to full
     _fadeOut = null;
+    _fadingOut = null;
     _fadeAnchor = null;
     _fadeElapsed = Duration.zero;
     _fade = _FadeState.idle;
+    fadeProgress.value = 0;
+    if (wasFading) notifyListeners(); // let the screen drop the transition
   }
 
   /// Freezes a running blend: both decks pause and the ramp's progress is banked
@@ -565,6 +581,7 @@ class PlayerController extends ChangeNotifier {
   void dispose() {
     _sleepTimer?.cancel();
     _fadeTicker?.cancel();
+    fadeProgress.dispose();
     for (final p in _players) {
       p.dispose();
     }

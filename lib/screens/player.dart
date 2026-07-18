@@ -14,6 +14,7 @@ import '../lyrics.dart';
 import '../models.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/mix_transition.dart';
 import '../widgets/track_sheet.dart';
 import '../widgets/waveform_bar.dart';
 import 'edit_track.dart';
@@ -340,6 +341,22 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
                       ),
                     ),
 
+                    // While an audio crossfade runs, the mix overlay blends the
+                    // outgoing cover into the incoming one, in step with the
+                    // audio ramp.
+                    if (player.crossfading && player.fadingOutTrack != null)
+                      SizedBox(
+                        width: width,
+                        height: width,
+                        child: MixTransition(
+                          outgoing: player.fadingOutTrack!,
+                          incoming: track,
+                          progress: player.fadeProgress,
+                          tint: _tint,
+                          radius: R.card,
+                        ),
+                      ),
+
                     // The heart that pops on a double-tap, then fades away.
                     _heartBurst(),
                   ],
@@ -411,32 +428,38 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
     return Row(
       children: [
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Flexible(
-                    child: Text(
-                      track.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: colors.primaryText,
+          // Cross-dissolve the title/artist when the song changes, so it eases
+          // over with the cover mix rather than snapping.
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 350),
+            child: Column(
+              key: ValueKey(track.id),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        track.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: colors.primaryText,
+                        ),
                       ),
                     ),
-                  ),
-                  if (format != null) ...[
-                    const SizedBox(width: 8),
-                    _formatBadge(format, colors),
+                    if (format != null) ...[
+                      const SizedBox(width: 8),
+                      _formatBadge(format, colors),
+                    ],
                   ],
-                ],
-              ),
-              const SizedBox(height: 4),
-              _artistLabel(track, s, colors),
-            ],
+                ),
+                const SizedBox(height: 4),
+                _artistLabel(track, s, colors),
+              ],
+            ),
           ),
         ),
         _HeartButton(track: track, store: store, tint: _tint),
