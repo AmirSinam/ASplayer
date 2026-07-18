@@ -5,6 +5,7 @@ import '../app_state.dart';
 import '../data/device_music.dart';
 import '../data/importer.dart';
 import '../theme.dart';
+import 'app_snack.dart';
 
 /// Pulls in every song the phone already holds — the same list Samsung Music
 /// shows. Files are linked, never copied.
@@ -27,11 +28,10 @@ class _ImportDeviceButtonState extends State<ImportDeviceButton> {
   Future<void> _run() async {
     final app = context.read<AppState>();
     final importer = context.read<Importer>();
-    final messenger = ScaffoldMessenger.of(context);
     final s = app.s;
 
     if (!await DeviceMusic.requestPermission()) {
-      messenger.showSnackBar(SnackBar(content: Text(s.permissionNeeded)));
+      if (mounted) showAppSnack(context, s.permissionNeeded, kind: SnackKind.warning);
       return;
     }
 
@@ -43,8 +43,9 @@ class _ImportDeviceButtonState extends State<ImportDeviceButton> {
 
     final songs = await DeviceMusic.scan();
     if (songs.isEmpty) {
-      if (mounted) setState(() => _busy = false);
-      messenger.showSnackBar(SnackBar(content: Text(s.noSongsOnPhone)));
+      if (!mounted) return;
+      setState(() => _busy = false);
+      showAppSnack(context, s.noSongsOnPhone, kind: SnackKind.info);
       return;
     }
 
@@ -64,7 +65,7 @@ class _ImportDeviceButtonState extends State<ImportDeviceButton> {
 
     if (!mounted) return;
     setState(() => _busy = false);
-    messenger.showSnackBar(SnackBar(content: Text(s.imported(added))));
+    showAppSnack(context, s.imported(added), kind: SnackKind.success);
   }
 
   @override

@@ -9,6 +9,7 @@ import '../data/importer.dart';
 import '../data/library_store.dart';
 import '../l10n.dart';
 import '../theme.dart';
+import '../widgets/app_snack.dart';
 import '../widgets/import_device_button.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -188,12 +189,12 @@ class _RestoreCoversButtonState extends State<_RestoreCoversButton> {
   Future<void> _run() async {
     final s = context.read<AppState>().s;
     final importer = context.read<Importer>();
-    final messenger = ScaffoldMessenger.of(context);
     setState(() => _running = true);
     final count = await importer.backfillCovers();
     if (!mounted) return;
     setState(() => _running = false);
-    messenger.showSnackBar(SnackBar(content: Text(s.coversRestored(count))));
+    showAppSnack(context, s.coversRestored(count),
+        kind: count == 0 ? SnackKind.info : SnackKind.success);
   }
 
   @override
@@ -237,7 +238,6 @@ class _AutoImportSwitchState extends State<_AutoImportSwitch> {
   Future<void> _toggle(bool value) async {
     final app = context.read<AppState>();
     final importer = context.read<Importer>();
-    final messenger = ScaffoldMessenger.of(context);
     final s = app.s;
 
     if (!value) {
@@ -246,7 +246,7 @@ class _AutoImportSwitchState extends State<_AutoImportSwitch> {
     }
 
     if (!await DeviceMusic.requestPermission()) {
-      messenger.showSnackBar(SnackBar(content: Text(s.permissionNeeded)));
+      if (mounted) showAppSnack(context, s.permissionNeeded, kind: SnackKind.warning);
       return;
     }
     app.deviceSyncEnabled = true;
@@ -257,7 +257,7 @@ class _AutoImportSwitchState extends State<_AutoImportSwitch> {
     final added = songs.isEmpty ? 0 : await importer.linkDeviceSongs(songs);
     if (!mounted) return;
     setState(() => _busy = false);
-    messenger.showSnackBar(SnackBar(content: Text(s.imported(added))));
+    showAppSnack(context, s.imported(added), kind: SnackKind.success);
   }
 
   @override
@@ -444,13 +444,12 @@ class _AboutCard extends StatelessWidget {
   }
 
   Future<void> _openSite(BuildContext context) async {
-    final messenger = ScaffoldMessenger.of(context);
     final opened = await launchUrl(
       Uri.parse(developerSite),
       mode: LaunchMode.externalApplication,
     );
-    if (!opened) {
-      messenger.showSnackBar(const SnackBar(content: Text(developerSite)));
+    if (!opened && context.mounted) {
+      showAppSnack(context, developerSite, kind: SnackKind.info);
     }
   }
 }

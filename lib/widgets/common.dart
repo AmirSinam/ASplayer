@@ -59,9 +59,21 @@ class Artwork extends StatelessWidget {
         File(path),
         fit: BoxFit.cover,
         gaplessPlayback: true,
-        cacheWidth: decodeWidth,
+        cacheWidth: decodeWidth == null || decodeWidth <= 0 ? null : decodeWidth,
         filterQuality: FilterQuality.low,
+        // A corrupt, truncated or unsupported cover just shows the placeholder.
         errorBuilder: (_, __, ___) => fallback,
+        // Fade a freshly decoded cover in, so it never pops in as the list
+        // scrolls or a track changes.
+        frameBuilder: (_, child, frame, wasSync) {
+          if (wasSync) return child;
+          return AnimatedOpacity(
+            opacity: frame == null ? 0 : 1,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+            child: child,
+          );
+        },
       );
     }
 

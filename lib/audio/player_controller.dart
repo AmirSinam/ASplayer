@@ -26,7 +26,7 @@ class PlayerController extends ChangeNotifier {
         _publish();
         notifyListeners();
       });
-      p.positionStream.listen((pos) => _maybeStartCrossfade(p, pos));
+      p.positionStream.listen((pos) => _onDeckPosition(p, pos));
     }
     _loadCrossfadePrefs();
     // Start the slider matching the phone's current media volume (Android).
@@ -68,6 +68,12 @@ class PlayerController extends ChangeNotifier {
   final ValueNotifier<double> fadeProgress = ValueNotifier<double>(0);
   Track? _fadingOut;
   Track? get fadingOutTrack => _fadingOut;
+
+  // The next track is loaded onto the idle deck a few seconds early so the blend
+  // can start instantly instead of waiting on a file open.
+  String? _preloadedId;
+  bool _preloading = false;
+  Future<void>? _preloadFuture;
 
   ASAudioHandler? _handler;
   void attach(ASAudioHandler handler) => _handler = handler;
@@ -347,21 +353,52 @@ class PlayerController extends ChangeNotifier {
     return want <= cap ? want : cap;
   }
 
-  /// Called for every position tick of a deck. When the active track reaches its
-  /// trigger point and a real next track exists, the blend begins. Guarded so it
-  /// can fire only once per track (state must be idle) and only for the active
-  /// deck.
-  void _maybeStartCrossfade(AudioPlayer deck, Duration pos) {
-    if (!_crossfade || _fade != _FadeState.idle || deck != _player) return;
-    final total = _player.duration;
-    if (total == null || total <= Duration.zero) return;
+  /// The active track's length. Trusts the decoder, but falls back to the tag
+  /// duration — some formats report a null decoder duration, which used to stop
+  /// the crossfade from ever triggering.
+  Duration? _activeTotal() {
+    final decoded = _player.duration;
+    if (decoded != null && decoded > Duration.zero) return decoded;
+    final tag = _current?.duration;
+    return (tag != null && tag > Duration.zero) ? tag : null;
+  }
+
+  /// Every position tick of the active deck: pre-loads the next track ahead of
+  /// time, then starts the blend once the track reaches its trigger point.
+  void _onDeckPosition(AudioPlayer deck, Duration pos) {
+    if (!_crossfade || deck != _player || _fade != _FadeState.idle) return;
+    final total = _activeTotal();
+    if (total == null) return;
     final fade = _effectiveFade(total);
     if (fade <= Duration.zero) return;
-    final triggerAt = total - fade;
-    if (pos < triggerAt || pos >= total) return;
+
+    _maybePreloadNext(pos, total, fade);
+
+    if (pos < total - fade) return;
     final target = _nextTrackForAuto();
     if (target == null || target.id == _current?.id) return;
     _beginCrossfade(target, fade);
+  }
+
+  /// Opens the next track on the idle deck a little before the blend is due, so
+  /// [_beginCrossfade] can start it instantly with no file-open delay.
+  void _maybePreloadNext(Duration pos, Duration total, Duration fade) {
+    if (_preloading) return;
+    if (pos < total - fade - const Duration(seconds: 4)) return;
+    final next = _nextTrackForAuto();
+    if (next == null || next.id == _current?.id || next.id == _preloadedId) return;
+    _preloading = true;
+    final id = next.id;
+    _preloadFuture = _idle.setFilePath(store.filePathOf(next)).then((_) async {
+      // If a blend already claimed the deck, leave it alone — _beginCrossfade
+      // will have loaded what it needs.
+      if (_fade == _FadeState.idle) {
+        await _idle.pause();
+        _preloadedId = id;
+      }
+    }).catchError((Object _) {}).whenComplete(() {
+      _preloading = false;
+    });
   }
 
   /// Loads [track] from 0 on the idle deck, makes it the active/visible track,
@@ -374,7 +411,18 @@ class PlayerController extends ChangeNotifier {
     final outgoingTrack = _current; // captured before _current becomes the next
 
     try {
-      await incoming.setFilePath(store.filePathOf(track));
+      // If a pre-load is still in flight for this deck, let it finish first so
+      // the same deck is never opened twice at once.
+      if (_preloading && _preloadFuture != null) {
+        try {
+          await _preloadFuture;
+        } catch (_) {}
+      }
+      // Skip the file open if this track was pre-loaded onto the idle deck.
+      if (_preloadedId != track.id) {
+        await incoming.setFilePath(store.filePathOf(track));
+      }
+      _preloadedId = null; // consumed
       await incoming.seek(Duration.zero); // always start the next track at 0
       await incoming.setSpeed(_speed);
       // Silence, start, silence again: just_audio can ignore a volume set before
@@ -510,6 +558,8 @@ class PlayerController extends ChangeNotifier {
   }
 
   Future<void> _load(Track track) async {
+    // A hard track change invalidates any pre-load queued for the old position.
+    _preloadedId = null;
     _current = track;
     try {
       await _player.setFilePath(store.filePathOf(track));

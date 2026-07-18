@@ -11,6 +11,7 @@ import '../data/device_music.dart';
 import '../data/importer.dart';
 import '../platform.dart';
 import '../theme.dart';
+import '../widgets/app_snack.dart';
 import '../widgets/common.dart';
 import 'favorites.dart';
 import 'home.dart';
@@ -67,23 +68,8 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
   void _notifyAdded(int count) {
     if (count <= 0 || !mounted) return;
     final s = context.read<AppState>().s;
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: accent,
-        duration: const Duration(seconds: 3),
-        content: Row(
-          children: [
-            const Icon(Icons.library_add_check_rounded, color: onAccent, size: 20),
-            const SizedBox(width: 10),
-            Text(
-              s.imported(count),
-              style: const TextStyle(color: onAccent, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-      ),
-    );
+    showAppSnack(context, s.imported(count),
+        kind: SnackKind.success, icon: Icons.library_add_check_rounded);
   }
 
   /// Files arriving from Telegram's share sheet, both while running and on a
@@ -135,10 +121,7 @@ class _RootScreenState extends State<RootScreen> with WidgetsBindingObserver {
       return;
     }
     _lastBack = now;
-    final s = app.s;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(s.pressBackAgain), duration: const Duration(seconds: 2)),
-    );
+    showAppSnack(context, app.s.pressBackAgain, duration: const Duration(seconds: 2));
   }
 
   @override
