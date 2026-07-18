@@ -26,7 +26,7 @@ class PlayerController extends ChangeNotifier {
         _publish();
         notifyListeners();
       });
-      p.positionStream.listen((pos) => _maybeCrossfade(p, pos));
+      p.positionStream.listen((pos) => _maybeStartCrossfade(p, pos));
     }
     _loadCrossfadePrefs();
     // Start the slider matching the phone's current media volume (Android).
@@ -48,11 +48,18 @@ class PlayerController extends ChangeNotifier {
   AudioPlayer get _idle => _players[1 - _active];
 
   // Crossfade is off by default; when off, playback takes the exact same
-  // single-player path it always did.
+  // single-player path it always did. See the "Crossfade" section below for the
+  // state machine that drives the blend.
   bool _crossfade = false;
   int _crossfadeSeconds = 6;
-  bool _fading = false;
-  Timer? _fadeTimer;
+
+  _FadeState _fade = _FadeState.idle;
+  Timer? _fadeTicker;
+  Duration _fadeLength = Duration.zero; // how long this blend should take
+  Duration _fadeElapsed = Duration.zero; // progress banked across pauses
+  DateTime? _fadeAnchor; // wall-clock start of the current running span
+  AudioPlayer? _fadeOut; // the deck fading out
+  bool get _crossfading => _fade != _FadeState.idle;
 
   ASAudioHandler? _handler;
   void attach(ASAudioHandler handler) => _handler = handler;
@@ -100,7 +107,7 @@ class PlayerController extends ChangeNotifier {
   // MARK: - Transport
 
   Future<void> play(Track track, List<Track> tracks) async {
-    _cancelFade();
+    _endCrossfade();
     _original = [...tracks];
     _queue = [...tracks];
     if (_shuffle) _reshuffle(keeping: track);
@@ -111,26 +118,32 @@ class PlayerController extends ChangeNotifier {
   Future<void> toggle() => playing ? pause() : resume();
 
   Future<void> resume() async {
+    // Resuming mid-blend continues both decks and the ramp where it froze.
+    if (_fade == _FadeState.paused) {
+      _resumeCrossfade();
+      return;
+    }
     await _player.setSpeed(_speed);
     await _player.play();
   }
 
   Future<void> pause() async {
-    _cancelFade();
+    if (_crossfading) {
+      _pauseCrossfade();
+      return;
+    }
     await _player.pause();
   }
 
+  /// Manual skip is always an immediate cut — crossfade is reserved for the
+  /// natural end of a track. Any blend in flight is finalised first.
   Future<void> next() {
-    // With crossfade on, slide into the next track instead of cutting to it.
-    if (_crossfade && !_fading && _queue.isNotEmpty) {
-      final target = _queue[(_index + 1) % _queue.length];
-      if (target.id != _current?.id) return _crossfadeTo(target);
-    }
+    _endCrossfade();
     return _advance(auto: false);
   }
 
   Future<void> previous() async {
-    _cancelFade();
+    _endCrossfade();
     if (_queue.isEmpty) return;
     // Standard behaviour: restart the track unless we're near the beginning.
     if (_player.position > const Duration(seconds: 3)) {
@@ -143,6 +156,9 @@ class PlayerController extends ChangeNotifier {
   }
 
   Future<void> seek(Duration position) async {
+    // Seeking during a blend collapses it: the incoming track becomes the sole
+    // track, then the seek applies to it.
+    if (_crossfading) _endCrossfade();
     await _player.seek(position);
     _publish();
   }
@@ -267,6 +283,18 @@ class PlayerController extends ChangeNotifier {
   }
 
   // MARK: - Crossfade
+  //
+  // Playback runs on two decks (_players). Normally only the active deck plays.
+  // As the active track nears its end, the next track starts from 0 on the idle
+  // deck and the two volumes cross over an equal-power curve; the old deck is
+  // then stopped and the decks have effectively swapped. The ramp is driven from
+  // the wall clock (not a step counter) so timer jitter or lag can never desync
+  // it, and it can be frozen and resumed for pause/resume.
+  //
+  // States: idle (single deck) → running (both decks, ramping) → idle. A blend
+  // can also be paused (frozen) or ended early (collapsed to the incoming deck).
+
+  static const _fadeTick = Duration(milliseconds: 50);
 
   Future<void> _loadCrossfadePrefs() async {
     final prefs = await SharedPreferences.getInstance();
@@ -277,7 +305,7 @@ class PlayerController extends ChangeNotifier {
 
   Future<void> setCrossfade(bool enabled) async {
     _crossfade = enabled;
-    if (!enabled) _cancelFade();
+    if (!enabled) _endCrossfade();
     (await SharedPreferences.getInstance()).setBool('crossfade', enabled);
     notifyListeners();
   }
@@ -293,8 +321,7 @@ class PlayerController extends ChangeNotifier {
   double get _restingVolume => Plat.isAndroid ? 1.0 : _volume;
 
   /// The track auto-play would move to next — or null when it would loop the
-  /// same track or stop at the end. Used to decide whether an early crossfade
-  /// makes sense.
+  /// same track or stop at the end (so no crossfade should start).
   Track? _nextTrackForAuto() {
     if (_queue.isEmpty) return null;
     if (_repeat == Repeat.one) return null;
@@ -303,82 +330,142 @@ class PlayerController extends ChangeNotifier {
     return _queue[(_index + 1) % _queue.length];
   }
 
-  /// Fired for every position tick of the active player: once the track is
-  /// inside the crossfade window of its end, start sliding into the next one.
-  void _maybeCrossfade(AudioPlayer p, Duration pos) {
-    if (!_crossfade || _fading || p != _player) return;
-    final total = _player.duration;
-    if (total == null || total == Duration.zero) return;
-    final window = Duration(seconds: _crossfadeSeconds);
-    // Skip very short tracks, and don't trigger in the opening seconds.
-    if (pos < window) return;
-    final remaining = total - pos;
-    if (remaining.isNegative || remaining > window) return;
-    final target = _nextTrackForAuto();
-    if (target == null || target.id == _current?.id) return;
-    _crossfadeTo(target);
+  /// How long the blend should actually run for this track. Capped at ~45% of
+  /// the track so short tracks still play, and so a crossfade duration longer
+  /// than the track can never span the whole thing.
+  Duration _effectiveFade(Duration total) {
+    final want = Duration(seconds: _crossfadeSeconds);
+    final cap = Duration(milliseconds: (total.inMilliseconds * 0.45).round());
+    return want <= cap ? want : cap;
   }
 
-  /// Loads [track] into the idle player, makes it the active one, then ramps the
-  /// two volumes past each other over the crossfade window.
-  Future<void> _crossfadeTo(Track track) async {
-    _fading = true;
+  /// Called for every position tick of a deck. When the active track reaches its
+  /// trigger point and a real next track exists, the blend begins. Guarded so it
+  /// can fire only once per track (state must be idle) and only for the active
+  /// deck.
+  void _maybeStartCrossfade(AudioPlayer deck, Duration pos) {
+    if (!_crossfade || _fade != _FadeState.idle || deck != _player) return;
+    final total = _player.duration;
+    if (total == null || total <= Duration.zero) return;
+    final fade = _effectiveFade(total);
+    if (fade <= Duration.zero) return;
+    final triggerAt = total - fade;
+    if (pos < triggerAt || pos >= total) return;
+    final target = _nextTrackForAuto();
+    if (target == null || target.id == _current?.id) return;
+    _beginCrossfade(target, fade);
+  }
+
+  /// Loads [track] from 0 on the idle deck, makes it the active/visible track,
+  /// then starts the volume ramp. Fire-and-forget; re-entry is blocked because
+  /// the state flips to running on the first (synchronous) line.
+  Future<void> _beginCrossfade(Track track, Duration fade) async {
+    _fade = _FadeState.running;
     final outgoing = _player;
     final incoming = _idle;
+
     try {
       await incoming.setFilePath(store.filePathOf(track));
+      await incoming.seek(Duration.zero); // always start the next track at 0
+      await incoming.setSpeed(_speed);
+      // Silence, start, silence again: just_audio can ignore a volume set before
+      // playback has actually begun (issue #439), which would otherwise let the
+      // new track blast at full over the old one.
+      await incoming.setVolume(0);
+      await incoming.play();
+      await incoming.setVolume(0);
     } catch (_) {
-      _fading = false;
-      return; // couldn't load; the outgoing track keeps playing as normal
+      // Load/handshake failed, or we were interrupted: leave the outgoing track
+      // playing and let its own completion advance normally.
+      if (_fade == _FadeState.running && _fadeOut == null) _fade = _FadeState.idle;
+      return;
     }
-    await incoming.setSpeed(_speed);
-    // Silence the incoming, start it, then silence it again. just_audio can
-    // ignore a volume set before playback has actually begun (issue #439), which
-    // otherwise makes the new track blast at full over the old one — the noise.
-    await incoming.setVolume(0);
-    await incoming.play();
-    await incoming.setVolume(0);
 
-    // The incoming track is now the one on screen and in the notification.
-    _active = 1 - _active;
+    // A pause/seek/skip during the awaits above will have reset the state; if so,
+    // undo the half-started incoming deck and bail without swapping.
+    if (_fade != _FadeState.running) {
+      await incoming.pause();
+      await incoming.seek(Duration.zero);
+      await incoming.setVolume(_restingVolume);
+      return;
+    }
+
+    _fadeOut = outgoing;
+    _active = 1 - _active; // incoming is now the active/visible track
     _current = track;
     await store.markPlayed(track);
     _publish();
     notifyListeners();
 
-    final rest = _restingVolume;
-    const steps = 40;
-    final stepMs = (_crossfadeSeconds * 1000 / steps).round().clamp(20, 400);
-    var i = 0;
-    _fadeTimer?.cancel();
-    _fadeTimer = Timer.periodic(Duration(milliseconds: stepMs), (t) {
-      i++;
-      final f = (i / steps).clamp(0.0, 1.0);
-      // Equal-power curve keeps the loudness steady through the blend.
-      incoming.setVolume(sin(f * pi / 2) * rest);
-      outgoing.setVolume(cos(f * pi / 2) * rest);
-      if (i >= steps) {
-        t.cancel();
-        outgoing.pause();
-        outgoing.seek(Duration.zero);
-        outgoing.setVolume(rest); // reset so it is ready to be reused
-        _fading = false;
-      }
-    });
+    _fadeLength = fade;
+    _fadeElapsed = Duration.zero;
+    _fadeAnchor = DateTime.now();
+    _startFadeTicker();
   }
 
-  /// Aborts a fade in progress: the active (incoming) track jumps to full and
-  /// the other is silenced. Called before any hard track change.
-  void _cancelFade() {
-    _fadeTimer?.cancel();
-    _fadeTimer = null;
-    if (_fading) {
-      final rest = _restingVolume;
-      _player.setVolume(rest);
-      _idle.pause();
-      _idle.setVolume(rest);
-      _fading = false;
+  void _startFadeTicker() {
+    _fadeTicker?.cancel();
+    _fadeTicker = Timer.periodic(_fadeTick, (_) => _onFadeTick());
+  }
+
+  /// One ramp step. Progress comes from the wall clock, so a late or coalesced
+  /// timer callback simply reads a larger elapsed value and stays correct.
+  void _onFadeTick() {
+    final anchor = _fadeAnchor;
+    if (anchor == null || _fade != _FadeState.running) return;
+    final elapsed = _fadeElapsed + DateTime.now().difference(anchor);
+    final t = _fadeLength.inMilliseconds == 0
+        ? 1.0
+        : (elapsed.inMilliseconds / _fadeLength.inMilliseconds).clamp(0.0, 1.0);
+    final rest = _restingVolume;
+    // Equal-power curve: perceived loudness stays steady through the blend.
+    _player.setVolume(sin(t * pi / 2) * rest); // incoming (active)
+    _fadeOut?.setVolume(cos(t * pi / 2) * rest); // outgoing
+    if (t >= 1.0) _endCrossfade();
+  }
+
+  /// Collapses any blend to the single active (incoming) deck at full volume and
+  /// stops the other deck. Used both for the natural end of a blend and to abort
+  /// one for a pause-less interruption (skip/seek/new queue). A no-op when idle.
+  void _endCrossfade() {
+    _fadeTicker?.cancel();
+    _fadeTicker = null;
+    final out = _fadeOut;
+    if (out != null) {
+      out.pause();
+      out.seek(Duration.zero);
+      out.setVolume(_restingVolume); // reset so it is ready to be reused
     }
+    if (_crossfading) _player.setVolume(_restingVolume); // incoming to full
+    _fadeOut = null;
+    _fadeAnchor = null;
+    _fadeElapsed = Duration.zero;
+    _fade = _FadeState.idle;
+  }
+
+  /// Freezes a running blend: both decks pause and the ramp's progress is banked
+  /// so [_resumeCrossfade] can pick up exactly where it left off.
+  void _pauseCrossfade() {
+    final anchor = _fadeAnchor;
+    if (anchor != null) {
+      _fadeElapsed += DateTime.now().difference(anchor);
+      _fadeAnchor = null;
+    }
+    _fadeTicker?.cancel();
+    _fadeTicker = null;
+    _fade = _FadeState.paused;
+    _player.pause();
+    _fadeOut?.pause();
+    notifyListeners();
+  }
+
+  void _resumeCrossfade() {
+    _fadeAnchor = DateTime.now();
+    _fade = _FadeState.running;
+    _fadeOut?.play();
+    _player.play();
+    _startFadeTicker();
+    notifyListeners();
   }
 
   // MARK: - Internals
@@ -387,7 +474,7 @@ class PlayerController extends ChangeNotifier {
   /// only case where repeat mode has a say.
   Future<void> _advance({required bool auto}) async {
     if (_queue.isEmpty) return;
-    _cancelFade();
+    _endCrossfade();
 
     if (auto && _repeat == Repeat.one) {
       await seek(Duration.zero);
@@ -477,13 +564,17 @@ class PlayerController extends ChangeNotifier {
   @override
   void dispose() {
     _sleepTimer?.cancel();
-    _fadeTimer?.cancel();
+    _fadeTicker?.cancel();
     for (final p in _players) {
       p.dispose();
     }
     super.dispose();
   }
 }
+
+/// The crossfade state machine's phases. `idle` is normal single-deck playback;
+/// `running` is an active blend; `paused` is a blend frozen mid-ramp.
+enum _FadeState { idle, running, paused }
 
 class ASAudioHandler extends BaseAudioHandler with SeekHandler {
   ASAudioHandler(this.controller);
