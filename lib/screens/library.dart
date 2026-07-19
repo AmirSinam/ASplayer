@@ -560,30 +560,10 @@ class _Playlists extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 170),
       children: [
-        GestureDetector(
-          onTap: () async {
-            final name = await promptForName(context, s);
-            if (name != null && name.isNotEmpty) await store.createPlaylist(name);
-          },
-          child: Container(
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.add, color: accent, size: 20),
-                const SizedBox(width: 10),
-                Text(
-                  s.newPlaylist,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: accent),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
+        _createRow(context, store, s, Icons.add, s.newPlaylist, mixtape: false),
+        const SizedBox(height: 8),
+        _createRow(context, store, s, Icons.graphic_eq, s.newMixtape, mixtape: true),
+        const SizedBox(height: 12),
         if (store.playlists.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 60),
@@ -593,9 +573,10 @@ class _Playlists extends StatelessWidget {
           ...store.playlists.map((playlist) {
             final tracks = store.byIds(playlist.trackIds);
             final minutes = tracks.fold<int>(0, (sum, t) => sum + t.durationMs) ~/ 60000;
+            final base = '${s.songsCount(tracks.length)} · ${s.totalDuration(minutes)}';
             return _GroupRow(
               title: playlist.name,
-              subtitle: '${s.songsCount(tracks.length)} · ${s.totalDuration(minutes)}',
+              subtitle: playlist.mixtape ? '${s.mixtapeLabel} · $base' : base,
               cover: tracks.isEmpty ? null : tracks.first,
               onLongPress: () => store.deletePlaylist(playlist),
               onTap: () => Navigator.push(
@@ -605,6 +586,44 @@ class _Playlists extends StatelessWidget {
             );
           }),
       ],
+    );
+  }
+
+  Widget _createRow(BuildContext context, LibraryStore store, Strings s, IconData icon,
+      String label, {required bool mixtape}) {
+    final colors = AppColors.of(context);
+    return GestureDetector(
+      onTap: () async {
+        final name = await promptForName(context, s);
+        if (name != null && name.isNotEmpty) {
+          await store.createPlaylist(name, mixtape: mixtape);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: accent, size: 20),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: accent),
+            ),
+            if (mixtape) ...[
+              const Spacer(),
+              Text(
+                s.mixtapeHint,
+                textAlign: TextAlign.end,
+                style: TextStyle(fontSize: 10.5, color: colors.secondaryText),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
@@ -646,9 +665,9 @@ class _PlaylistDetail extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 170),
               children: [
                 FilledButton.icon(
-                  onPressed: () => player.play(tracks.first, tracks),
-                  icon: const Icon(Icons.play_arrow),
-                  label: Text(s.playAll),
+                  onPressed: () => _playFrom(player, tracks.first, tracks),
+                  icon: Icon(playlist.mixtape ? Icons.graphic_eq : Icons.play_arrow),
+                  label: Text(playlist.mixtape ? s.mixtapeLabel : s.playAll),
                   style: FilledButton.styleFrom(
                     backgroundColor: accent,
                     foregroundColor: onAccent,
@@ -658,12 +677,22 @@ class _PlaylistDetail extends StatelessWidget {
                 const SizedBox(height: 12),
                 ...tracks.map((track) => GestureDetector(
                       behavior: HitTestBehavior.opaque,
-                      onTap: () => player.play(track, tracks),
+                      onTap: () => _playFrom(player, track, tracks),
                       onLongPress: () => showTrackSheet(context, track, fromPlaylist: playlist),
                       child: TrackRow(track: track, isCurrent: player.current?.id == track.id),
                     )),
               ],
             ),
     );
+  }
+
+  /// A mixtape plays as one continuous crossfaded set; a normal playlist cuts
+  /// between tracks as usual.
+  void _playFrom(PlayerController player, Track track, List<Track> tracks) {
+    if (playlist.mixtape) {
+      player.playMixtape(track, tracks);
+    } else {
+      player.play(track, tracks);
+    }
   }
 }

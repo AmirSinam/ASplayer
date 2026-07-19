@@ -34,16 +34,22 @@ class Artwork extends StatelessWidget {
     final store = context.read<LibraryStore>();
     final path = track == null ? null : store.coverPathOf(track!);
 
-    final fallback = DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.08)],
-        ),
-      ),
-      child: const Center(child: Icon(Icons.music_note, color: accent, size: 20)),
-    );
+    // No cover → a generated one, coloured deterministically from the artist so
+    // a given artist always looks the same and the library stays coherent.
+    final Widget fallback = track == null
+        ? DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.08)],
+              ),
+            ),
+            child: const Center(child: Icon(Icons.music_note, color: accent, size: 20)),
+          )
+        : DynamicCover(
+            seed: track!.artist.trim().isNotEmpty ? track!.artist : track!.title,
+          );
 
     Widget child;
     if (path == null) {
@@ -82,6 +88,84 @@ class Artwork extends StatelessWidget {
       child: SizedBox(width: size, height: size, child: child),
     );
   }
+}
+
+/// A generated cover for a track with no artwork. The colour is derived from a
+/// seed (the artist name), so it is stable per artist and the whole library
+/// reads as one set. Drawn on the fly — no file is created.
+class DynamicCover extends StatelessWidget {
+  const DynamicCover({super.key, required this.seed});
+
+  final String seed;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DynamicCoverPainter(seed),
+      child: const SizedBox.expand(),
+    );
+  }
+}
+
+class _DynamicCoverPainter extends CustomPainter {
+  _DynamicCoverPainter(this.seed);
+
+  final String seed;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final hue = (seed.hashCode.abs() % 360).toDouble();
+    // Muted, jewel-toned range so every generated cover feels part of one system
+    // rather than a random neon.
+    final deep = HSLColor.fromAHSL(1, hue, 0.42, 0.26).toColor();
+    final bright = HSLColor.fromAHSL(1, (hue + 24) % 360, 0.5, 0.5).toColor();
+
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [bright, deep],
+        ).createShader(rect),
+    );
+
+    // A soft light blob for depth.
+    canvas.drawCircle(
+      Offset(size.width * 0.74, size.height * 0.24),
+      size.shortestSide * 0.42,
+      Paint()..color = Colors.white.withValues(alpha: 0.06),
+    );
+
+    // Monogram.
+    final letter = _initial(seed);
+    final tp = TextPainter(
+      text: TextSpan(
+        text: letter,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.92),
+          fontSize: size.shortestSide * 0.42,
+          fontWeight: FontWeight.w800,
+          height: 1,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(
+      canvas,
+      Offset((size.width - tp.width) / 2, (size.height - tp.height) / 2),
+    );
+  }
+
+  String _initial(String s) {
+    final t = s.trim();
+    if (t.isEmpty) return '♪';
+    return t[0].toUpperCase();
+  }
+
+  @override
+  bool shouldRepaint(_DynamicCoverPainter old) => old.seed != seed;
 }
 
 /// The blurred cover behind everything. Glass needs something to refract.

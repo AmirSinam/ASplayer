@@ -101,6 +101,21 @@ class LibraryStore extends ChangeNotifier {
     await save();
   }
 
+  Future<void> setMoods(Track track, List<String> moods) async {
+    track.moods
+      ..clear()
+      ..addAll(moods);
+    await save();
+  }
+
+  /// Every track carrying [moodId].
+  List<Track> tracksByMood(String moodId) =>
+      _tracks.where((t) => t.moods.contains(moodId)).toList();
+
+  /// Mood ids that at least one track actually uses, in preset order handled by
+  /// the caller.
+  Set<String> get usedMoods => {for (final t in _tracks) ...t.moods};
+
   Future<void> markPlayed(Track track) async {
     track.playCount += 1;
     track.lastPlayedAt = DateTime.now();
@@ -151,7 +166,7 @@ class LibraryStore extends ChangeNotifier {
     await save();
   }
 
-  Future<void> createPlaylist(String name, {Track? withTrack}) async {
+  Future<void> createPlaylist(String name, {Track? withTrack, bool mixtape = false}) async {
     _playlists.insert(
       0,
       Playlist(
@@ -159,6 +174,7 @@ class LibraryStore extends ChangeNotifier {
         name: name,
         trackIds: withTrack == null ? [] : [withTrack.id],
         createdAt: DateTime.now(),
+        mixtape: mixtape,
       ),
     );
     await save();

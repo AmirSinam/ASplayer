@@ -52,6 +52,10 @@ class PlayerController extends ChangeNotifier {
   // state machine that drives the blend.
   bool _crossfade = false;
   int _crossfadeSeconds = 6;
+  // A mixtape forces crossfade on for its playback session, regardless of the
+  // global setting.
+  bool _mixtapeMode = false;
+  bool get _crossfadeActive => _crossfade || _mixtapeMode;
 
   _FadeState _fade = _FadeState.idle;
   Timer? _fadeTicker;
@@ -115,12 +119,21 @@ class PlayerController extends ChangeNotifier {
   // MARK: - Transport
 
   Future<void> play(Track track, List<Track> tracks) async {
+    _mixtapeMode = false;
     _endCrossfade();
     _original = [...tracks];
     _queue = [...tracks];
     if (_shuffle) _reshuffle(keeping: track);
     await _load(track);
     await resume();
+  }
+
+  /// Plays a set as a continuous mixtape: crossfade is forced on for this
+  /// session even if the global setting is off.
+  Future<void> playMixtape(Track track, List<Track> tracks) async {
+    await play(track, tracks);
+    _mixtapeMode = true;
+    notifyListeners();
   }
 
   Future<void> toggle() => playing ? pause() : resume();
@@ -352,7 +365,7 @@ class PlayerController extends ChangeNotifier {
   /// can fire only once per track (state must be idle) and only for the active
   /// deck.
   void _maybeStartCrossfade(AudioPlayer deck, Duration pos) {
-    if (!_crossfade || _fade != _FadeState.idle || deck != _player) return;
+    if (!_crossfadeActive || _fade != _FadeState.idle || deck != _player) return;
     final total = _player.duration;
     if (total == null || total <= Duration.zero) return;
     final fade = _effectiveFade(total);

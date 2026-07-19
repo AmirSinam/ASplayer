@@ -6,6 +6,7 @@ import '../audio/player_controller.dart';
 import '../data/library_store.dart';
 import '../l10n.dart';
 import '../models.dart';
+import '../moods.dart';
 import '../screens/edit_track.dart';
 import '../screens/lyrics_screen.dart';
 import '../theme.dart';
@@ -69,6 +70,7 @@ Future<void> showTrackSheet(
             item(Icons.playlist_play, s.playNext, () => player.playNext(track)),
             item(Icons.queue_music, s.addToQueue, () => player.addToQueue(track)),
             item(Icons.playlist_add, s.addToPlaylist, () => showAddToPlaylist(context, track)),
+            item(Icons.mood, s.moodTag, () => showMoodPicker(context, track)),
             item(Icons.edit_outlined, s.editSong, () {
               Navigator.push(context,
                   MaterialPageRoute(builder: (_) => EditTrackScreen(track: track)));
@@ -208,6 +210,77 @@ Future<void> showAddTracksToPlaylist(BuildContext context, List<Track> tracks) {
                 )),
             const SizedBox(height: 8),
           ],
+        ),
+      ),
+    ),
+  );
+}
+
+/// A sheet of mood chips; toggling one saves immediately.
+Future<void> showMoodPicker(BuildContext context, Track track) {
+  final store = context.read<LibraryStore>();
+  final app = context.read<AppState>();
+  final s = app.s;
+  final fa = app.lang == Lang.fa;
+  final colors = AppColors.of(context);
+  final selected = {...track.moods};
+
+  return showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: colors.background,
+    showDragHandle: true,
+    builder: (sheetContext) => StatefulBuilder(
+      builder: (context, setSheet) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                s.moodTag,
+                style: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold, color: colors.primaryText),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: moods.map((m) {
+                  final on = selected.contains(m.id);
+                  return GestureDetector(
+                    onTap: () {
+                      setSheet(() => on ? selected.remove(m.id) : selected.add(m.id));
+                      store.setMoods(track, selected.toList());
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: on ? accent : colors.glass,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: on ? accent : colors.rim),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(m.icon, size: 16, color: on ? onAccent : colors.secondaryText),
+                          const SizedBox(width: 6),
+                          Text(
+                            m.label(fa),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: on ? onAccent : colors.secondaryText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
         ),
       ),
     ),

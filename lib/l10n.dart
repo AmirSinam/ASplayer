@@ -72,6 +72,11 @@ class Strings {
     required this.upNext,
     required this.queueEmpty,
     required this.share,
+    required this.moodTag,
+    required this.howYouFeel,
+    required this.newMixtape,
+    required this.mixtapeLabel,
+    required this.mixtapeHint,
     required this.sleepTimer,
     required this.cancelTimer,
     required this.playbackSpeed,
@@ -150,6 +155,7 @@ class Strings {
   final String playNext, addToQueue, markFavorite, unmarkFavorite;
   final String removeFromPlaylist, deleteFromLibrary, deletePlaylist;
   final String queue, nowPlaying, upNext, queueEmpty, share;
+  final String moodTag, howYouFeel, newMixtape, mixtapeLabel, mixtapeHint;
   final String sleepTimer, cancelTimer, playbackSpeed, normalSpeed;
   final String settings, trackCount, storageUsed;
   final String howToAdd, howToAddBody, backgroundPlay, backgroundPlayBody;
@@ -231,6 +237,11 @@ class Strings {
     upNext: 'Up next',
     queueEmpty: 'Nothing in the queue',
     share: 'Share',
+    moodTag: 'Mood',
+    howYouFeel: 'How you feel',
+    newMixtape: 'New mixtape',
+    mixtapeLabel: 'Mixtape',
+    mixtapeHint: 'Plays as one continuous set with crossfade.',
     sleepTimer: 'Sleep timer',
     cancelTimer: 'Cancel timer',
     playbackSpeed: 'Playback speed',
@@ -357,6 +368,11 @@ class Strings {
     upNext: 'بعدی',
     queueEmpty: 'چیزی در صف نیست',
     share: 'هم‌رسانی',
+    moodTag: 'حال',
+    howYouFeel: 'حال‌وهوا',
+    newMixtape: 'میکس‌تیپ جدید',
+    mixtapeLabel: 'میکس‌تیپ',
+    mixtapeHint: 'به‌صورت یک ستِ پیوسته با کراس‌فید پخش می‌شود.',
     sleepTimer: 'تایمر خواب',
     cancelTimer: 'لغو تایمر',
     playbackSpeed: 'سرعت پخش',

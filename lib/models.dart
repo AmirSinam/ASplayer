@@ -38,7 +38,9 @@ class Track {
     this.favorite = false,
     this.lyrics = '',
     List<int>? bookmarksMs,
-  }) : bookmarksMs = bookmarksMs ?? [];
+    List<String>? moods,
+  })  : bookmarksMs = bookmarksMs ?? [],
+        moods = moods ?? [];
 
   final String id;
   String title;
@@ -72,6 +74,10 @@ class Track {
   /// to a favourite part later. Kept sorted.
   final List<int> bookmarksMs;
 
+  /// Free-form mood tags the user attaches (calm, energetic, focus…), used to
+  /// play "by how I feel" rather than by name.
+  final List<String> moods;
+
   Duration get duration => Duration(milliseconds: durationMs);
 
   bool get hasLyrics => lyrics.trim().isNotEmpty;
@@ -96,6 +102,7 @@ class Track {
         'favorite': favorite,
         'lyrics': lyrics,
         'bookmarksMs': bookmarksMs,
+        'moods': moods,
       };
 
   factory Track.fromJson(Map<String, dynamic> json) => Track(
@@ -115,6 +122,7 @@ class Track {
         favorite: json['favorite'] as bool? ?? false,
         lyrics: json['lyrics'] as String? ?? '',
         bookmarksMs: (json['bookmarksMs'] as List?)?.cast<int>() ?? [],
+        moods: (json['moods'] as List?)?.cast<String>() ?? [],
       );
 }
 
@@ -124,6 +132,7 @@ class Playlist {
     required this.name,
     required this.trackIds,
     required this.createdAt,
+    this.mixtape = false,
   });
 
   final String id;
@@ -131,11 +140,15 @@ class Playlist {
   final List<String> trackIds;
   final DateTime createdAt;
 
+  /// A mixtape plays with crossfade forced on, as one continuous set.
+  final bool mixtape;
+
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
         'trackIds': trackIds,
         'createdAt': createdAt.toIso8601String(),
+        'mixtape': mixtape,
       };
 
   factory Playlist.fromJson(Map<String, dynamic> json) => Playlist(
@@ -143,6 +156,7 @@ class Playlist {
         name: json['name'] as String,
         trackIds: (json['trackIds'] as List).cast<String>(),
         createdAt: DateTime.parse(json['createdAt'] as String),
+        mixtape: json['mixtape'] as bool? ?? false,
       );
 }
 

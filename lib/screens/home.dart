@@ -5,7 +5,9 @@ import '../app_state.dart';
 import '../audio/player_controller.dart';
 import '../data/importer.dart';
 import '../data/library_store.dart';
+import '../l10n.dart';
 import '../models.dart';
+import '../moods.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/track_sheet.dart';
@@ -181,6 +183,8 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 22),
             ],
 
+            ..._moodSection(context, store, player, s, app.lang == Lang.fa),
+
             if (recent.isNotEmpty) ...[
               SectionHeader(title: s.recentlyPlayed),
               const SizedBox(height: 6),
@@ -190,6 +194,60 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  /// A row of mood chips for moods actually in use; tapping plays that mood
+  /// shuffled. Empty (returns nothing) until the user tags some songs.
+  List<Widget> _moodSection(BuildContext context, LibraryStore store,
+      PlayerController player, Strings s, bool fa) {
+    final used = moods.where((m) => store.usedMoods.contains(m.id)).toList();
+    if (used.isEmpty) return const [];
+    final colors = AppColors.of(context);
+
+    return [
+      SectionHeader(title: s.howYouFeel),
+      const SizedBox(height: 10),
+      SizedBox(
+        height: 40,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: used.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 9),
+          itemBuilder: (context, index) {
+            final m = used[index];
+            return GestureDetector(
+              onTap: () {
+                final list = store.tracksByMood(m.id);
+                if (list.isEmpty) return;
+                final shuffled = [...list]..shuffle();
+                player.play(shuffled.first, shuffled);
+              },
+              child: Glass(
+                radius: 999,
+                elevated: false,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(m.icon, size: 16, color: accent),
+                    const SizedBox(width: 6),
+                    Text(
+                      m.label(fa),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: colors.primaryText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      const SizedBox(height: 22),
+    ];
   }
 
   Widget _row(BuildContext context, Track track, List<Track> queue) {
