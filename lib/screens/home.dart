@@ -11,6 +11,7 @@ import '../moods.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 import '../widgets/track_sheet.dart';
+import 'party.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -85,6 +86,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
+              const _PartyButton(),
+              const SizedBox(width: 10),
               const _AddButton(),
             ],
           ),
@@ -273,6 +276,32 @@ class _AddButton extends StatelessWidget {
         height: 44,
         decoration: const BoxDecoration(color: accent, shape: BoxShape.circle),
         child: const Icon(Icons.add, color: onAccent, size: 22),
+      ),
+    );
+  }
+}
+
+/// A one-tap entry to party mode, right on Home so it is easy to reach. Kept
+/// glassy (secondary) so the filled Add button stays the primary action.
+class _PartyButton extends StatelessWidget {
+  const _PartyButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final s = context.watch<AppState>().s;
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PartyScreen()),
+      ),
+      child: Tooltip(
+        message: s.partyMode,
+        child: const Glass(
+          radius: 999,
+          elevated: false,
+          padding: EdgeInsets.all(11),
+          child: Icon(Icons.groups_rounded, color: accent, size: 22),
+        ),
       ),
     );
   }
