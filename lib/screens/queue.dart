@@ -5,6 +5,7 @@ import '../app_state.dart';
 import '../audio/player_controller.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'party.dart';
 
 class QueueScreen extends StatelessWidget {
   const QueueScreen({super.key});
@@ -24,6 +25,16 @@ class QueueScreen extends StatelessWidget {
         title: Text(s.queue),
         backgroundColor: Colors.transparent,
         foregroundColor: colors.primaryText,
+        actions: [
+          IconButton(
+            tooltip: s.partyMode,
+            icon: const Icon(Icons.groups_rounded),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PartyScreen()),
+            ),
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),

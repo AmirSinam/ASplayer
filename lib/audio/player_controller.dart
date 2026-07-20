@@ -221,6 +221,16 @@ class PlayerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// A guest added a track in party mode: start it if nothing is playing,
+  /// otherwise drop it onto the end of the queue.
+  Future<void> partyAdd(Track track) async {
+    if (_current == null) {
+      await play(track, [track]);
+    } else {
+      await addToQueue(track);
+    }
+  }
+
   Future<void> playNext(Track track) async {
     _queue.insert(min(_index + 1, _queue.length), track);
     _original = [..._queue];

@@ -1,7 +1,7 @@
 name: asplayer
 description: ASplayer — keep your own songs, listen offline.
 publish_to: "none"
-version: 1.0.4+12
+version: 1.0.5+13
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -32,6 +32,10 @@ dependencies:
 
   # share the audio file out to other apps (Telegram, etc.)
   share_plus: ^10.1.4
+
+  # party queue: a tiny local web server on the host + a QR for guests to join
+  shelf: ^1.4.1
+  qr_flutter: ^4.1.0
   # pull a dominant colour out of each cover to tint the player screen
   palette_generator: ^0.3.3+7
 

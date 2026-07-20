@@ -2,6 +2,9 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Party mode: the host runs a tiny local web server for guests to join -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Background playback -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

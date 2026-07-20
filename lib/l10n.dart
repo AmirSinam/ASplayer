@@ -77,6 +77,13 @@ class Strings {
     required this.newMixtape,
     required this.mixtapeLabel,
     required this.mixtapeHint,
+    required this.partyMode,
+    required this.endParty,
+    required this.partyScanHint,
+    required this.partySameWifi,
+    required this.partyNoNetwork,
+    required this.partyStarting,
+    required this.partyAdded,
     required this.sleepTimer,
     required this.cancelTimer,
     required this.playbackSpeed,
@@ -156,6 +163,8 @@ class Strings {
   final String removeFromPlaylist, deleteFromLibrary, deletePlaylist;
   final String queue, nowPlaying, upNext, queueEmpty, share;
   final String moodTag, howYouFeel, newMixtape, mixtapeLabel, mixtapeHint;
+  final String partyMode, endParty, partyScanHint, partySameWifi, partyNoNetwork, partyStarting;
+  final String Function(int) partyAdded;
   final String sleepTimer, cancelTimer, playbackSpeed, normalSpeed;
   final String settings, trackCount, storageUsed;
   final String howToAdd, howToAddBody, backgroundPlay, backgroundPlayBody;
@@ -242,6 +251,13 @@ class Strings {
     newMixtape: 'New mixtape',
     mixtapeLabel: 'Mixtape',
     mixtapeHint: 'Plays as one continuous set with crossfade.',
+    partyMode: 'Party mode',
+    endParty: 'End party',
+    partyScanHint: 'Guests scan this to add songs to your queue',
+    partySameWifi: 'Everyone must be on the same Wi‑Fi (or your hotspot).',
+    partyNoNetwork: 'Connect to a Wi‑Fi or turn on your hotspot, then try again.',
+    partyStarting: 'Starting…',
+    partyAdded: _enPartyAdded,
     sleepTimer: 'Sleep timer',
     cancelTimer: 'Cancel timer',
     playbackSpeed: 'Playback speed',
@@ -373,6 +389,13 @@ class Strings {
     newMixtape: 'میکس‌تیپ جدید',
     mixtapeLabel: 'میکس‌تیپ',
     mixtapeHint: 'به‌صورت یک ستِ پیوسته با کراس‌فید پخش می‌شود.',
+    partyMode: 'حالت مهمانی',
+    endParty: 'پایان مهمانی',
+    partyScanHint: 'مهمان‌ها این رو اسکن کنن تا آهنگ به صفت اضافه کنن',
+    partySameWifi: 'همه باید روی یک وای‌فای (یا هات‌اسپاتِ تو) باشن.',
+    partyNoNetwork: 'به یک وای‌فای وصل شو یا هات‌اسپاتت رو روشن کن، بعد دوباره امتحان کن.',
+    partyStarting: 'در حال آماده‌سازی…',
+    partyAdded: _faPartyAdded,
     sleepTimer: 'تایمر خواب',
     cancelTimer: 'لغو تایمر',
     playbackSpeed: 'سرعت پخش',
@@ -455,6 +478,7 @@ String _enSleepsIn(String t) => 'Stops in $t';
 String _enTotal(int m) => m < 60 ? '$m min' : '${m ~/ 60} h ${m % 60} min';
 String _enCoversRestored(int n) => n == 0 ? 'No new covers found' : '$n covers restored';
 String _enSeconds(int n) => '${n}s';
+String _enPartyAdded(int n) => n == 1 ? '1 song added by guests' : '$n songs added by guests';
 
 String _faSelected(int n) => '$n انتخاب شد';
 String _faImported(int n) => '$n آهنگ اضافه شد';
@@ -465,3 +489,4 @@ String _faSleepsIn(String t) => 'خاموش می‌شود تا $t';
 String _faTotal(int m) => m < 60 ? '$m دقیقه' : '${m ~/ 60} ساعت و ${m % 60} دقیقه';
 String _faCoversRestored(int n) => n == 0 ? 'کاور تازه‌ای پیدا نشد' : '$n کاور بازیابی شد';
 String _faSeconds(int n) => '$n ثانیه';
+String _faPartyAdded(int n) => '$n آهنگ توسط مهمان‌ها اضافه شد';
