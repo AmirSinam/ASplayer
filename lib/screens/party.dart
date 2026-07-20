@@ -36,7 +36,7 @@ class _PartyScreenState extends State<PartyScreen> {
     setState(() => _starting = true);
     final store = context.read<LibraryStore>();
     final player = context.read<PlayerController>();
-    final server = PartyServer(store: store, onAdd: player.partyAdd);
+    final server = PartyServer(store: store, player: player);
     final url = await server.start();
     if (!mounted) {
       server.stop();
@@ -175,7 +175,45 @@ class _PartyScreenState extends State<PartyScreen> {
               ],
             ),
           ),
-        const SizedBox(height: 26),
+        const SizedBox(height: 22),
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 4, 6, 4),
+          decoration: BoxDecoration(
+            color: colors.primaryText.withValues(alpha: 0.04),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: colors.secondaryText.withValues(alpha: 0.15)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      s.partyAllowPlayback,
+                      style: TextStyle(
+                        color: colors.primaryText,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      s.partyAllowPlaybackHint,
+                      style: TextStyle(color: colors.secondaryText, fontSize: 11.5, height: 1.5),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: _server?.allowStreaming ?? false,
+                activeThumbColor: accent,
+                onChanged: (v) => setState(() => _server?.allowStreaming = v),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
         SizedBox(
           width: double.infinity,
           child: FilledButton.icon(

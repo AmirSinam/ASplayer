@@ -84,6 +84,8 @@ class Strings {
     required this.partyNoNetwork,
     required this.partyStarting,
     required this.partyAdded,
+    required this.partyAllowPlayback,
+    required this.partyAllowPlaybackHint,
     required this.sleepTimer,
     required this.cancelTimer,
     required this.playbackSpeed,
@@ -165,6 +167,7 @@ class Strings {
   final String moodTag, howYouFeel, newMixtape, mixtapeLabel, mixtapeHint;
   final String partyMode, endParty, partyScanHint, partySameWifi, partyNoNetwork, partyStarting;
   final String Function(int) partyAdded;
+  final String partyAllowPlayback, partyAllowPlaybackHint;
   final String sleepTimer, cancelTimer, playbackSpeed, normalSpeed;
   final String settings, trackCount, storageUsed;
   final String howToAdd, howToAddBody, backgroundPlay, backgroundPlayBody;
@@ -258,6 +261,8 @@ class Strings {
     partyNoNetwork: 'Connect to a Wi‑Fi or turn on your hotspot, then try again.',
     partyStarting: 'Starting…',
     partyAdded: _enPartyAdded,
+    partyAllowPlayback: 'Let guests play on their own phone',
+    partyAllowPlaybackHint: 'Streams your audio to their device. Use only with people you trust — off by default.',
     sleepTimer: 'Sleep timer',
     cancelTimer: 'Cancel timer',
     playbackSpeed: 'Playback speed',
@@ -396,6 +401,8 @@ class Strings {
     partyNoNetwork: 'به یک وای‌فای وصل شو یا هات‌اسپاتت رو روشن کن، بعد دوباره امتحان کن.',
     partyStarting: 'در حال آماده‌سازی…',
     partyAdded: _faPartyAdded,
+    partyAllowPlayback: 'مهمان‌ها روی گوشیِ خودشون هم پخش کنن',
+    partyAllowPlaybackHint: 'صدای تو رو به دستگاهشون استریم می‌کنه. فقط با آدم‌های مورد اعتماد؛ پیش‌فرض خاموشه.',
     sleepTimer: 'تایمر خواب',
     cancelTimer: 'لغو تایمر',
     playbackSpeed: 'سرعت پخش',
