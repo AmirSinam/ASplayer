@@ -19,14 +19,23 @@ class PlayerController extends ChangeNotifier {
     // A listener on each player; only the active one drives state and advance.
     for (final p in _players) {
       p.playerStateStream.listen((state) {
+        // The deck being faded out — or reserved while a blend is still loading
+        // its incoming deck — must never drive auto-advance; the crossfade owns
+        // that transition. Ignoring it here is what keeps a slow load from
+        // turning the blend into a hard cut.
+        if (p == _reservedOutgoing) return;
         if (p != _player) return; // the fading-out player is ignored
         if (state.processingState == ProcessingState.completed) {
+          _xlog('completed -> advance (${_current?.title})');
           _advance(auto: true);
         }
         _publish();
         notifyListeners();
       });
-      p.positionStream.listen((pos) => _maybeStartCrossfade(p, pos));
+      p.positionStream.listen((pos) {
+        _maybeStartCrossfade(p, pos);
+        if (p == _player && !_positionOut.isClosed) _positionOut.add(pos);
+      });
     }
     _loadCrossfadePrefs();
     // Start the slider matching the phone's current media volume (Android).
@@ -63,7 +72,25 @@ class PlayerController extends ChangeNotifier {
   Duration _fadeElapsed = Duration.zero; // progress banked across pauses
   DateTime? _fadeAnchor; // wall-clock start of the current running span
   AudioPlayer? _fadeOut; // the deck fading out
+  // While a blend is still loading its incoming deck, the outgoing deck is
+  // "reserved". If it happens to reach the end during that async window its
+  // completion must be ignored — otherwise it spuriously auto-advances and the
+  // crossfade collapses into a hard cut. Cleared the instant the decks swap.
+  AudioPlayer? _reservedOutgoing;
   bool get crossfading => _fade != _FadeState.idle;
+
+  // A stable position stream that always follows the *active* deck. Returning
+  // `_player.positionStream` directly froze the UI after a crossfade, because
+  // the deck swap left the StreamBuilder subscribed to the now-idle deck.
+  final _positionOut = StreamController<Duration>.broadcast();
+
+  // Emitted in release too (via debugPrint), so a crossfade problem can be traced
+  // on a real phone with `adb logcat | grep xfade`. Volume is tiny: at most a
+  // handful of lines per track transition. Flip [logCrossfade] off to silence it.
+  static bool logCrossfade = true;
+  void _xlog(String m) {
+    if (logCrossfade) debugPrint('[xfade] $m');
+  }
 
   // Surfaced for the on-screen mix transition. [fadeProgress] runs 0→1 across a
   // blend (frozen while paused); [fadingOutTrack] is the track leaving. The UI
@@ -99,7 +126,7 @@ class PlayerController extends ChangeNotifier {
   int get crossfadeSeconds => _crossfadeSeconds;
   Duration? get sleepRemaining => _sleepRemaining;
 
-  Stream<Duration> get positionStream => _player.positionStream;
+  Stream<Duration> get positionStream => _positionOut.stream;
   Duration get position => _player.position;
   Duration get duration => _player.duration ?? _current?.duration ?? Duration.zero;
 
@@ -384,6 +411,8 @@ class PlayerController extends ChangeNotifier {
     if (pos < triggerAt || pos >= total) return;
     final target = _nextTrackForAuto();
     if (target == null || target.id == _current?.id) return;
+    _xlog('trigger pos=${pos.inMilliseconds} total=${total.inMilliseconds} '
+        'fade=${fade.inMilliseconds} active=$_active -> ${target.title}');
     _beginCrossfade(target, fade);
   }
 
@@ -395,6 +424,10 @@ class PlayerController extends ChangeNotifier {
     final outgoing = _player;
     final incoming = _idle;
     final outgoingTrack = _current; // captured before _current becomes the next
+    // Guard the outgoing deck for the whole async load below: if it reaches its
+    // end before we swap, its completion is ignored instead of hard-cutting.
+    _reservedOutgoing = outgoing;
+    _xlog('begin -> ${track.title} fade=${fade.inMilliseconds}ms active=$_active');
 
     try {
       await incoming.setFilePath(store.filePathOf(track));
@@ -409,6 +442,8 @@ class PlayerController extends ChangeNotifier {
     } catch (_) {
       // Load/handshake failed, or we were interrupted: leave the outgoing track
       // playing and let its own completion advance normally.
+      _reservedOutgoing = null;
+      _xlog('begin FAILED to load ${track.title}; falling back to hard cut');
       if (_fade == _FadeState.running && _fadeOut == null) _fade = _FadeState.idle;
       return;
     }
@@ -416,20 +451,27 @@ class PlayerController extends ChangeNotifier {
     // A pause/seek/skip during the awaits above will have reset the state; if so,
     // undo the half-started incoming deck and bail without swapping.
     if (_fade != _FadeState.running) {
+      _reservedOutgoing = null;
+      _xlog('begin aborted mid-load (state=$_fade)');
       await incoming.pause();
       await incoming.seek(Duration.zero);
       await incoming.setVolume(_restingVolume);
       return;
     }
 
+    // Swap synchronously (no await between here and clearing the guard) so the
+    // outgoing deck is protected right up to the moment `p != _player` takes over.
     _fadeOut = outgoing;
     _fadingOut = outgoingTrack;
     fadeProgress.value = 0;
     _active = 1 - _active; // incoming is now the active/visible track
     _current = track;
-    await store.markPlayed(track);
+    _reservedOutgoing = null; // now covered by the `p != _player` check
+    // Off the fade's critical path: a disk write here would delay the ramp start.
+    unawaited(store.markPlayed(track));
     _publish();
     notifyListeners();
+    _xlog('begin ok, swapped active=$_active current=${track.title}');
 
     _fadeLength = fade;
     _fadeElapsed = Duration.zero;
@@ -479,7 +521,10 @@ class PlayerController extends ChangeNotifier {
     _fadeElapsed = Duration.zero;
     _fade = _FadeState.idle;
     fadeProgress.value = 0;
-    if (wasFading) notifyListeners(); // let the screen drop the transition
+    if (wasFading) {
+      _xlog('end blend');
+      notifyListeners(); // let the screen drop the transition
+    }
   }
 
   /// Freezes a running blend: both decks pause and the ramp's progress is banked
@@ -513,6 +558,7 @@ class PlayerController extends ChangeNotifier {
   /// only case where repeat mode has a say.
   Future<void> _advance({required bool auto}) async {
     if (_queue.isEmpty) return;
+    _xlog('advance auto=$auto index=$_index repeat=$_repeat');
     _endCrossfade();
 
     if (auto && _repeat == Repeat.one) {
@@ -605,6 +651,7 @@ class PlayerController extends ChangeNotifier {
     _sleepTimer?.cancel();
     _fadeTicker?.cancel();
     fadeProgress.dispose();
+    _positionOut.close();
     for (final p in _players) {
       p.dispose();
     }

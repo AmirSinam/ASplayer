@@ -13,6 +13,15 @@ class Importer {
 
   final LibraryStore store;
 
+  // A process-wide counter folded into every generated id. Two imports can run
+  // at once — a share-sheet intent and the device auto-sync, say — and
+  // `microsecondsSinceEpoch` alone can repeat within the same microsecond, which
+  // would collide their track ids (and overwrite each other's copied file). The
+  // counter makes each id unique regardless of timing; `_seq++` is atomic within
+  // the single-threaded event loop, so no two ids can ever match.
+  static int _seq = 0;
+  String _newId() => '${DateTime.now().microsecondsSinceEpoch}_${_seq++}';
+
   /// Opens the system picker. Returns how many files were added.
   Future<int> pickAndImport() async {
     final result = await FilePicker.pickFiles(
@@ -33,7 +42,7 @@ class Importer {
       final sourceFile = File(source);
       if (!await sourceFile.exists()) continue;
 
-      final id = '${DateTime.now().microsecondsSinceEpoch}_$added';
+      final id = _newId();
       final extension = p.extension(source).isEmpty ? '.mp3' : p.extension(source);
       final fileName = '$id$extension';
       final destination = File(p.join(store.mediaDir.path, fileName));
@@ -71,7 +80,7 @@ class Importer {
       final file = File(song.path);
       if (!await file.exists()) continue;
 
-      final id = '${DateTime.now().microsecondsSinceEpoch}_$added';
+      final id = _newId();
       String? coverName;
       try {
         final tags = readMetadata(file, getImage: true);
