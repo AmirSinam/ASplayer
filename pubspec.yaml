@@ -1,7 +1,7 @@
 name: asplayer
 description: ASplayer — keep your own songs, listen offline.
 publish_to: "none"
-version: 1.0.9+17
+version: 1.0.10+18
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

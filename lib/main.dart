@@ -6,6 +6,7 @@ import 'app_state.dart';
 import 'audio/player_controller.dart';
 import 'data/importer.dart';
 import 'data/library_store.dart';
+import 'data/stats_store.dart';
 import 'platform.dart';
 import 'screens/root.dart';
 import 'theme.dart';
@@ -15,7 +16,8 @@ Future<void> main() async {
 
   final store = await LibraryStore.open();
   final appState = await AppState.load();
-  final controller = PlayerController(store);
+  final stats = await StatsStore.open();
+  final controller = PlayerController(store, stats);
 
   // audio_service (the notification / lock-screen bridge) is mobile-only. On
   // desktop the player runs fine without it — just no OS media controls.
@@ -38,6 +40,7 @@ Future<void> main() async {
         ChangeNotifierProvider.value(value: appState),
         ChangeNotifierProvider.value(value: store),
         ChangeNotifierProvider.value(value: controller),
+        Provider.value(value: stats),
         Provider.value(value: Importer(store)),
       ],
       child: const ASplayerApp(),

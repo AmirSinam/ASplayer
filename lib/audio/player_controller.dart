@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/device_music.dart';
 import '../data/library_store.dart';
+import '../data/stats_store.dart';
 import '../data/widget_bridge.dart';
 import '../models.dart';
 import '../platform.dart';
@@ -15,7 +16,7 @@ import '../platform.dart';
 /// Owns playback and the queue. The audio_service handler below is a thin shell
 /// that forwards notification / headphone commands here.
 class PlayerController extends ChangeNotifier {
-  PlayerController(this.store) {
+  PlayerController(this.store, this.stats) {
     // A listener on each player; only the active one drives state and advance.
     for (final p in _players) {
       p.playerStateStream.listen((state) {
@@ -38,6 +39,14 @@ class PlayerController extends ChangeNotifier {
       });
     }
     _loadCrossfadePrefs();
+    // A light heartbeat that banks real listening time into the monthly stats.
+    // Fires only while something is actually playing, so pauses aren't counted.
+    _statsTick = Timer.periodic(const Duration(seconds: 15), (_) {
+      final track = _current;
+      if (track != null && playing) {
+        stats.addListening(const Duration(seconds: 15), track);
+      }
+    });
     // Start the slider matching the phone's current media volume (Android).
     if (Plat.isAndroid) {
       DeviceMusic.getVolume().then((v) {
@@ -48,6 +57,8 @@ class PlayerController extends ChangeNotifier {
   }
 
   final LibraryStore store;
+  final StatsStore stats;
+  Timer? _statsTick;
 
   // Two players so the next track can fade in while the current one fades out.
   // The idle player stays paused and silent unless a crossfade is happening.
@@ -115,6 +126,17 @@ class PlayerController extends ChangeNotifier {
   Timer? _sleepTimer;
   Duration? _sleepRemaining;
 
+  // Sleep fade: in the final stretch of a sleep timer the volume eases down to
+  // silence instead of cutting out. Ramped on the player's own volume (the same
+  // channel crossfade uses) off a wall clock, so it never fights the system
+  // volume and can't desync.
+  bool _sleepFade = true;
+  static const _sleepFadeSeconds = 60;
+  bool _sleepFading = false;
+  Timer? _sleepFadeTicker;
+  DateTime? _sleepFadeAnchor;
+  Duration _sleepFadeLength = Duration.zero;
+
   Track? get current => _current;
   bool get playing => _player.playing;
   List<Track> get queue => List.unmodifiable(_queue);
@@ -125,6 +147,7 @@ class PlayerController extends ChangeNotifier {
   bool get crossfade => _crossfade;
   int get crossfadeSeconds => _crossfadeSeconds;
   Duration? get sleepRemaining => _sleepRemaining;
+  bool get sleepFade => _sleepFade;
 
   Stream<Duration> get positionStream => _positionOut.stream;
   Duration get position => _player.position;
@@ -324,9 +347,13 @@ class PlayerController extends ChangeNotifier {
       final left = end.difference(DateTime.now());
       if (left.isNegative || left.inSeconds <= 0) {
         pause();
-        cancelSleepTimer();
+        cancelSleepTimer(); // also stops the fade and restores volume for next time
       } else {
         _sleepRemaining = left;
+        // Enter the soft-fade window once, in the final stretch of the timer.
+        if (_sleepFade && !_sleepFading && playing && left.inSeconds <= _sleepFadeSeconds) {
+          _startSleepFade(left);
+        }
         notifyListeners();
       }
     });
@@ -334,10 +361,47 @@ class PlayerController extends ChangeNotifier {
   }
 
   void cancelSleepTimer() {
+    _stopSleepFade(restore: true);
     _sleepTimer?.cancel();
     _sleepTimer = null;
     _sleepRemaining = null;
     notifyListeners();
+  }
+
+  /// Eases the volume down to silence across the time [remaining], on the
+  /// player's own volume channel and off the wall clock (so timer jitter can't
+  /// desync it). A squared curve keeps the tail gentle rather than abrupt.
+  void _startSleepFade(Duration remaining) {
+    _sleepFading = true;
+    _sleepFadeLength = remaining;
+    _sleepFadeAnchor = DateTime.now();
+    _sleepFadeTicker?.cancel();
+    _sleepFadeTicker = Timer.periodic(_fadeTick, (_) => _onSleepFadeTick());
+    _xlog('sleep-fade begin over ${remaining.inSeconds}s');
+  }
+
+  void _onSleepFadeTick() {
+    final anchor = _sleepFadeAnchor;
+    if (anchor == null || !_sleepFading) return;
+    final len = _sleepFadeLength.inMilliseconds;
+    final t = len == 0
+        ? 1.0
+        : (DateTime.now().difference(anchor).inMilliseconds / len).clamp(0.0, 1.0);
+    // Squared curve: gentle at first, only steep near silence — smoother to the
+    // ear than a straight linear ramp.
+    _player.setVolume((1 - t) * (1 - t) * _restingVolume);
+    if (t >= 1.0) {
+      _sleepFadeTicker?.cancel();
+      _sleepFadeTicker = null;
+    }
+  }
+
+  void _stopSleepFade({required bool restore}) {
+    _sleepFadeTicker?.cancel();
+    _sleepFadeTicker = null;
+    if (_sleepFading && restore) _player.setVolume(_restingVolume);
+    _sleepFading = false;
+    _sleepFadeAnchor = null;
   }
 
   // MARK: - Crossfade
@@ -358,6 +422,14 @@ class PlayerController extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _crossfade = prefs.getBool('crossfade') ?? false;
     _crossfadeSeconds = prefs.getInt('crossfadeSeconds') ?? 6;
+    _sleepFade = prefs.getBool('sleepFade') ?? true;
+    notifyListeners();
+  }
+
+  Future<void> setSleepFade(bool value) async {
+    _sleepFade = value;
+    if (!value) _stopSleepFade(restore: true);
+    (await SharedPreferences.getInstance()).setBool('sleepFade', value);
     notifyListeners();
   }
 
@@ -402,7 +474,10 @@ class PlayerController extends ChangeNotifier {
   /// can fire only once per track (state must be idle) and only for the active
   /// deck.
   void _maybeStartCrossfade(AudioPlayer deck, Duration pos) {
-    if (!_crossfadeActive || _fade != _FadeState.idle || deck != _player) return;
+    // Never start a blend during a sleep fade — the two volume ramps would fight.
+    if (!_crossfadeActive || _sleepFading || _fade != _FadeState.idle || deck != _player) {
+      return;
+    }
     final total = _player.duration;
     if (total == null || total <= Duration.zero) return;
     final fade = _effectiveFade(total);
@@ -469,6 +544,7 @@ class PlayerController extends ChangeNotifier {
     _reservedOutgoing = null; // now covered by the `p != _player` check
     // Off the fade's critical path: a disk write here would delay the ramp start.
     unawaited(store.markPlayed(track));
+    stats.addPlay(track);
     _publish();
     notifyListeners();
     _xlog('begin ok, swapped active=$_active current=${track.title}');
@@ -595,6 +671,7 @@ class PlayerController extends ChangeNotifier {
     }
 
     await store.markPlayed(track);
+    stats.addPlay(track);
     _publish();
     notifyListeners();
   }
@@ -649,7 +726,10 @@ class PlayerController extends ChangeNotifier {
   @override
   void dispose() {
     _sleepTimer?.cancel();
+    _sleepFadeTicker?.cancel();
+    _statsTick?.cancel();
     _fadeTicker?.cancel();
+    unawaited(stats.flush());
     fadeProgress.dispose();
     _positionOut.close();
     for (final p in _players) {

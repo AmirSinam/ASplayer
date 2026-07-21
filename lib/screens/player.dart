@@ -901,6 +901,20 @@ class _PlayerScreenState extends State<PlayerScreen> with TickerProviderStateMix
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            StatefulBuilder(
+              builder: (context, setSheet) => SwitchListTile(
+                secondary: Icon(Icons.blur_on_rounded, color: _tint),
+                title: Text(s.sleepFade),
+                subtitle: Text(s.sleepFadeBody),
+                value: player.sleepFade,
+                activeThumbColor: accent,
+                onChanged: (value) {
+                  player.setSleepFade(value);
+                  setSheet(() {});
+                },
+              ),
+            ),
+            const Divider(height: 1),
             ..._sleepMinutes.map((minutes) => ListTile(
                   leading: Icon(Icons.bedtime_outlined, color: _tint),
                   title: Text(s.minutesLabel(minutes)),

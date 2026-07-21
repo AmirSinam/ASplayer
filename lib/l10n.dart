@@ -88,6 +88,8 @@ class Strings {
     required this.partyAllowPlaybackHint,
     required this.sleepTimer,
     required this.cancelTimer,
+    required this.sleepFade,
+    required this.sleepFadeBody,
     required this.playbackSpeed,
     required this.normalSpeed,
     required this.settings,
@@ -169,6 +171,7 @@ class Strings {
   final String Function(int) partyAdded;
   final String partyAllowPlayback, partyAllowPlaybackHint;
   final String sleepTimer, cancelTimer, playbackSpeed, normalSpeed;
+  final String sleepFade, sleepFadeBody;
   final String settings, trackCount, storageUsed;
   final String howToAdd, howToAddBody, backgroundPlay, backgroundPlayBody;
   final String language, appearance, appearanceSystem, appearanceLight, appearanceDark;
@@ -265,6 +268,8 @@ class Strings {
     partyAllowPlaybackHint: 'Streams your audio to their device. Use only with people you trust — off by default.',
     sleepTimer: 'Sleep timer',
     cancelTimer: 'Cancel timer',
+    sleepFade: 'Soft fade before sleep',
+    sleepFadeBody: 'Ease the volume down instead of cutting out.',
     playbackSpeed: 'Playback speed',
     normalSpeed: 'Normal',
     settings: 'Settings',
@@ -405,6 +410,8 @@ class Strings {
     partyAllowPlaybackHint: 'صدای تو رو به دستگاهشون استریم می‌کنه. فقط با آدم‌های مورد اعتماد؛ پیش‌فرض خاموشه.',
     sleepTimer: 'تایمر خواب',
     cancelTimer: 'لغو تایمر',
+    sleepFade: 'محوِ نرم پیش از خواب',
+    sleepFadeBody: 'به‌جای قطعِ ناگهانی، صدا آرام‌آرام کم می‌شود.',
     playbackSpeed: 'سرعت پخش',
     normalSpeed: 'عادی',
     settings: 'تنظیمات',
